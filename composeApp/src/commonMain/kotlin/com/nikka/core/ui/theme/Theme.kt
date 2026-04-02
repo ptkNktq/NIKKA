@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 
 private val NikkaColorScheme = darkColorScheme(
     primary = LavenderPrimary,
-    onPrimary = TextPrimary,
+    onPrimary = TextOnAccent,
     primaryContainer = LavenderPrimaryDark,
     onPrimaryContainer = TextPrimary,
     secondary = MauveSecondary,

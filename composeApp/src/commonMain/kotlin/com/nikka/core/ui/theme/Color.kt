@@ -26,6 +26,7 @@ val DarkSurfaceContainer = Color(0xFF2D2A35)
 // Text
 val TextPrimary = Color(0xFFE2DDE8)
 val TextSecondary = Color(0xFF9E98A8)
+val TextOnAccent = Color(0xFF1E1C24)
 
 // Status indicators
 val StatusGreen = Color(0xFF6BBE6B)

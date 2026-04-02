@@ -20,6 +20,7 @@ data class HomeUiState(
     val isAddGroupDialogVisible: Boolean = false,
     val isAddTaskDialogVisible: Boolean = false,
     val addTaskTargetGroupId: String? = null,
+    val deleteGroupConfirmId: String? = null,
     val isLoading: Boolean = true,
 )
 
@@ -137,6 +138,20 @@ class HomeViewModel(
 
     fun showAddTaskDialog(groupId: String) {
         _uiState.update { it.copy(isAddTaskDialogVisible = true, addTaskTargetGroupId = groupId) }
+    }
+
+    fun showDeleteGroupConfirm(groupId: String) {
+        _uiState.update { it.copy(deleteGroupConfirmId = groupId) }
+    }
+
+    fun confirmDeleteGroup() {
+        val groupId = _uiState.value.deleteGroupConfirmId ?: return
+        removeGroup(groupId)
+        _uiState.update { it.copy(deleteGroupConfirmId = null) }
+    }
+
+    fun dismissDeleteGroupConfirm() {
+        _uiState.update { it.copy(deleteGroupConfirmId = null) }
     }
 
     fun dismissAddTaskDialog() {

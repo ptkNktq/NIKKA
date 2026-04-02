@@ -77,7 +77,7 @@ fun HomeScreen(
                 onToggleTask = viewModel::toggleTask,
                 onShowAddTask = viewModel::showAddTaskDialog,
                 onRemoveTask = viewModel::removeTask,
-                onRemoveGroup = viewModel::removeGroup,
+                onRemoveGroup = viewModel::showDeleteGroupConfirm,
                 onToggleGroupCollapse = viewModel::toggleGroupCollapse,
                 onResetGroup = viewModel::resetGroupTasks,
             )
@@ -154,6 +154,30 @@ private fun HomeDialogs(uiState: HomeUiState, viewModel: HomeViewModel) {
             confirmText = "追加",
             onConfirm = { title -> viewModel.addTask(uiState.addTaskTargetGroupId!!, title) },
             onDismiss = viewModel::dismissAddTaskDialog,
+        )
+    }
+    if (uiState.deleteGroupConfirmId != null) {
+        val groupName = uiState.groups
+            .find { it.id == uiState.deleteGroupConfirmId }?.name ?: ""
+        AlertDialog(
+            onDismissRequest = viewModel::dismissDeleteGroupConfirm,
+            title = { Text("グループを削除") },
+            text = { Text("「$groupName」とその日課をすべて削除しますか？") },
+            confirmButton = {
+                Button(
+                    onClick = viewModel::confirmDeleteGroup,
+                    colors = ButtonDefaults.buttonColors(containerColor = StatusRed),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text("削除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissDeleteGroupConfirm) {
+                    Text("キャンセル")
+                }
+            },
+            shape = RoundedCornerShape(20.dp),
         )
     }
 }
