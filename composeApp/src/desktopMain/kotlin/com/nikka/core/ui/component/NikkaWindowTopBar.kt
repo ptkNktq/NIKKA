@@ -9,7 +9,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.CropSquare
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,7 +24,6 @@ import androidx.compose.ui.window.WindowScope
 @Composable
 fun WindowScope.NikkaWindowTopBar(
     onMinimize: () -> Unit,
-    onMaximize: () -> Unit,
     onClose: () -> Unit,
     actions: @Composable () -> Unit = {},
 ) {
@@ -35,7 +33,6 @@ fun WindowScope.NikkaWindowTopBar(
             windowControls = {
                 WindowControlButtons(
                     onMinimize = onMinimize,
-                    onMaximize = onMaximize,
                     onClose = onClose,
                 )
             },
@@ -46,7 +43,6 @@ fun WindowScope.NikkaWindowTopBar(
 @Composable
 private fun WindowControlButtons(
     onMinimize: () -> Unit,
-    onMaximize: () -> Unit,
     onClose: () -> Unit,
 ) {
     Row(
@@ -58,12 +54,6 @@ private fun WindowControlButtons(
             icon = Icons.Rounded.Remove,
             contentDescription = "最小化",
             onClick = onMinimize,
-        )
-        WindowButton(
-            color = Color(0xFF6DB5A0),
-            icon = Icons.Rounded.CropSquare,
-            contentDescription = "最大化",
-            onClick = onMaximize,
         )
         WindowButton(
             color = Color(0xFFBE8F8F),
