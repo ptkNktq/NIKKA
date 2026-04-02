@@ -16,6 +16,7 @@ import kotlin.uuid.Uuid
 data class HomeUiState(
     val groups: List<TaskGroup> = emptyList(),
     val tasks: List<DailyTask> = emptyList(),
+    val collapsedGroupIds: Set<String> = emptySet(),
     val isAddGroupDialogVisible: Boolean = false,
     val isAddTaskDialogVisible: Boolean = false,
     val addTaskTargetGroupId: String? = null,
@@ -99,6 +100,26 @@ class HomeViewModel(
                 tasks = state.tasks.map { task ->
                     if (task.id == taskId) task.copy(isCompleted = !task.isCompleted) else task
                 },
+            )
+        }
+        persistTasks()
+    }
+
+    fun toggleGroupCollapse(groupId: String) {
+        _uiState.update { state ->
+            val newCollapsed = if (groupId in state.collapsedGroupIds) {
+                state.collapsedGroupIds - groupId
+            } else {
+                state.collapsedGroupIds + groupId
+            }
+            state.copy(collapsedGroupIds = newCollapsed)
+        }
+    }
+
+    fun resetAllTasks() {
+        _uiState.update { state ->
+            state.copy(
+                tasks = state.tasks.map { it.copy(isCompleted = false) },
             )
         }
         persistTasks()

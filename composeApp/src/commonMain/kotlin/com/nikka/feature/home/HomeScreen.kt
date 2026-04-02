@@ -17,14 +17,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,36 +67,41 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    Column(
-        modifier = Modifier.fillMaxSize().background(DarkBackground),
-    ) {
-        topBar {
-            AddGroupButton(onClick = { viewModel.showAddGroupDialog() })
+    Box(modifier = Modifier.fillMaxSize().background(DarkBackground)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            topBar {
+                IconButton(onClick = { viewModel.resetAllTasks() }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = "リセット",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            HomeContent(
+                uiState = uiState,
+                onToggleTask = viewModel::toggleTask,
+                onShowAddTask = viewModel::showAddTaskDialog,
+                onRemoveTask = viewModel::removeTask,
+                onRemoveGroup = viewModel::removeGroup,
+                onToggleGroupCollapse = viewModel::toggleGroupCollapse,
+            )
         }
-        HomeContent(
-            uiState = uiState,
-            onToggleTask = viewModel::toggleTask,
-            onShowAddTask = viewModel::showAddTaskDialog,
-            onRemoveTask = viewModel::removeTask,
-            onRemoveGroup = viewModel::removeGroup,
-        )
+        FloatingActionButton(
+            onClick = { viewModel.showAddGroupDialog() },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
+            containerColor = LavenderPrimary,
+            shape = CircleShape,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Add,
+                contentDescription = "グループ追加",
+                tint = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
     }
 
     HomeDialogs(uiState = uiState, viewModel = viewModel)
-}
-
-@Composable
-private fun AddGroupButton(onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = LavenderPrimary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-        ),
-        shape = RoundedCornerShape(12.dp),
-    ) {
-        Text("+ グループ追加")
-    }
 }
 
 @Composable
@@ -98,6 +111,7 @@ private fun HomeContent(
     onShowAddTask: (String) -> Unit,
     onRemoveTask: (String) -> Unit,
     onRemoveGroup: (String) -> Unit,
+    onToggleGroupCollapse: (String) -> Unit,
 ) {
     if (uiState.groups.isEmpty()) {
         EmptyState()
@@ -112,6 +126,8 @@ private fun HomeContent(
                 GroupCard(
                     group = group,
                     tasks = uiState.tasks.filter { it.groupId == group.id },
+                    isCollapsed = group.id in uiState.collapsedGroupIds,
+                    onToggleCollapse = { onToggleGroupCollapse(group.id) },
                     onToggleTask = onToggleTask,
                     onAddTask = { onShowAddTask(group.id) },
                     onRemoveTask = onRemoveTask,
@@ -167,7 +183,7 @@ private fun EmptyState() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "右上の「グループ追加」から始めましょう！",
+                text = "右下の＋ボタンからグループを追加しましょう！",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -179,6 +195,8 @@ private fun EmptyState() {
 private fun GroupCard(
     group: TaskGroup,
     tasks: List<DailyTask>,
+    isCollapsed: Boolean,
+    onToggleCollapse: () -> Unit,
     onToggleTask: (String) -> Unit,
     onAddTask: () -> Unit,
     onRemoveTask: (String) -> Unit,
@@ -199,15 +217,19 @@ private fun GroupCard(
             accentColor = accentColor,
             completedCount = tasks.count { it.isCompleted },
             totalCount = tasks.size,
+            isCollapsed = isCollapsed,
+            onToggleCollapse = onToggleCollapse,
             onAddTask = onAddTask,
             onRemoveGroup = onRemoveGroup,
         )
-        GroupCardBody(
-            tasks = tasks,
-            accentColor = accentColor,
-            onToggleTask = onToggleTask,
-            onRemoveTask = onRemoveTask,
-        )
+        if (!isCollapsed) {
+            GroupCardBody(
+                tasks = tasks,
+                accentColor = accentColor,
+                onToggleTask = onToggleTask,
+                onRemoveTask = onRemoveTask,
+            )
+        }
     }
 }
 
@@ -217,11 +239,13 @@ private fun GroupCardHeader(
     accentColor: androidx.compose.ui.graphics.Color,
     completedCount: Int,
     totalCount: Int,
+    isCollapsed: Boolean,
+    onToggleCollapse: () -> Unit,
     onAddTask: () -> Unit,
     onRemoveGroup: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onToggleCollapse),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -229,6 +253,16 @@ private fun GroupCardHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            Icon(
+                imageVector = if (isCollapsed) {
+                    Icons.Rounded.KeyboardArrowRight
+                } else {
+                    Icons.Rounded.KeyboardArrowDown
+                },
+                contentDescription = if (isCollapsed) "展開" else "折りたたみ",
+                modifier = Modifier.size(20.dp),
+                tint = accentColor,
+            )
             Box(
                 modifier = Modifier.size(12.dp).clip(CircleShape).background(accentColor),
             )
@@ -365,6 +399,8 @@ private fun InputDialog(
                     focusedBorderColor = LavenderPrimary,
                     cursorColor = LavenderPrimary,
                 ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onConfirm(text) }),
             )
         },
         confirmButton = {
