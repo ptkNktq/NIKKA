@@ -9,13 +9,15 @@ import com.nikka.core.ui.theme.NikkaTheme
 import com.nikka.feature.home.HomeScreen
 
 @Composable
-fun App() {
+fun App(
+    topBar: @Composable (actions: @Composable () -> Unit) -> Unit = {},
+) {
     NikkaTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background,
         ) {
-            HomeScreen()
+            HomeScreen(topBar = topBar)
         }
     }
 }

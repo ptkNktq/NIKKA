@@ -42,9 +42,12 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.rounded.SportsEsports
+import androidx.compose.material3.Icon
 import com.nikka.core.model.DailyTask
 import com.nikka.core.model.TaskGroup
-import com.nikka.core.ui.component.NikkaTopBar
 import com.nikka.core.ui.theme.GroupColors
 import com.nikka.core.ui.theme.DarkBackground
 import com.nikka.core.ui.theme.TealPrimary
@@ -52,17 +55,16 @@ import com.nikka.core.ui.theme.TealPrimary
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
+    topBar: @Composable (actions: @Composable () -> Unit) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize().background(DarkBackground),
     ) {
-        NikkaTopBar(
-            actions = {
-                AddGroupButton(onClick = { viewModel.showAddGroupDialog() })
-            },
-        )
+        topBar {
+            AddGroupButton(onClick = { viewModel.showAddGroupDialog() })
+        }
         HomeContent(
             uiState = uiState,
             onToggleTask = viewModel::toggleTask,
@@ -153,9 +155,11 @@ private fun EmptyState() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = "🎮",
-                style = MaterialTheme.typography.displayLarge,
+            Icon(
+                imageVector = Icons.Rounded.SportsEsports,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = "まだグループがありません",
@@ -264,7 +268,7 @@ private fun GroupCardBody(
 ) {
     if (tasks.isEmpty()) {
         Text(
-            text = "日課を追加してみましょう ✨",
+            text = "日課を追加してみましょう",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 22.dp, top = 4.dp),
@@ -324,9 +328,11 @@ private fun TaskRow(
             onClick = onRemove,
             modifier = Modifier.size(28.dp),
         ) {
-            Text(
-                text = "🗑",
-                style = MaterialTheme.typography.bodySmall,
+            Icon(
+                imageVector = Icons.Outlined.Delete,
+                contentDescription = "削除",
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

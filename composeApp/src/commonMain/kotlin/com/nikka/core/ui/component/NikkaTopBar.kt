@@ -6,7 +6,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Spa
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,9 +22,10 @@ import androidx.compose.ui.unit.dp
 import com.nikka.core.ui.theme.DarkSurfaceVariant
 
 @Composable
-fun NikkaTopBar(
+fun NikkaTopBarContent(
     modifier: Modifier = Modifier,
     actions: @Composable () -> Unit = {},
+    windowControls: @Composable () -> Unit = {},
 ) {
     Box(
         modifier = modifier
@@ -30,7 +35,7 @@ fun NikkaTopBar(
                 color = DarkSurfaceVariant,
                 shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
             )
-            .padding(horizontal = 20.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -41,9 +46,11 @@ fun NikkaTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = "🌸",
-                    style = MaterialTheme.typography.titleLarge,
+                Icon(
+                    imageVector = Icons.Rounded.Spa,
+                    contentDescription = "NIKKA",
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.primary,
                 )
                 Text(
                     text = "NIKKA",
@@ -58,7 +65,13 @@ fun NikkaTopBar(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            actions()
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                actions()
+                windowControls()
+            }
         }
     }
 }
