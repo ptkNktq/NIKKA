@@ -1,12 +1,15 @@
 package com.nikka.feature.home
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.nikka.core.data.TaskRepository
 import com.nikka.core.model.DailyTask
 import com.nikka.core.model.TaskGroup
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -16,13 +19,28 @@ data class HomeUiState(
     val isAddGroupDialogVisible: Boolean = false,
     val isAddTaskDialogVisible: Boolean = false,
     val addTaskTargetGroupId: String? = null,
+    val isLoading: Boolean = true,
 )
 
 @OptIn(ExperimentalUuidApi::class)
-class HomeViewModel : ViewModel() {
+class HomeViewModel(
+    private val repository: TaskRepository,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    init {
+        loadData()
+    }
+
+    private fun loadData() {
+        viewModelScope.launch {
+            val groups = repository.loadGroups()
+            val tasks = repository.loadTasks()
+            _uiState.update { it.copy(groups = groups, tasks = tasks, isLoading = false) }
+        }
+    }
 
     fun addGroup(name: String) {
         if (name.isBlank()) return
@@ -37,6 +55,7 @@ class HomeViewModel : ViewModel() {
                 isAddGroupDialogVisible = false,
             )
         }
+        persistGroups()
     }
 
     fun removeGroup(groupId: String) {
@@ -46,6 +65,8 @@ class HomeViewModel : ViewModel() {
                 tasks = state.tasks.filter { it.groupId != groupId },
             )
         }
+        persistGroups()
+        persistTasks()
     }
 
     fun addTask(groupId: String, title: String) {
@@ -62,12 +83,14 @@ class HomeViewModel : ViewModel() {
                 addTaskTargetGroupId = null,
             )
         }
+        persistTasks()
     }
 
     fun removeTask(taskId: String) {
         _uiState.update { state ->
             state.copy(tasks = state.tasks.filter { it.id != taskId })
         }
+        persistTasks()
     }
 
     fun toggleTask(taskId: String) {
@@ -78,6 +101,7 @@ class HomeViewModel : ViewModel() {
                 },
             )
         }
+        persistTasks()
     }
 
     fun showAddGroupDialog() {
@@ -94,6 +118,14 @@ class HomeViewModel : ViewModel() {
 
     fun dismissAddTaskDialog() {
         _uiState.update { it.copy(isAddTaskDialogVisible = false, addTaskTargetGroupId = null) }
+    }
+
+    private fun persistGroups() {
+        viewModelScope.launch { repository.saveGroups(_uiState.value.groups) }
+    }
+
+    private fun persistTasks() {
+        viewModelScope.launch { repository.saveTasks(_uiState.value.tasks) }
     }
 
     companion object {
