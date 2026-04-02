@@ -56,7 +56,6 @@ import androidx.compose.ui.unit.dp
 import com.nikka.core.model.DailyTask
 import com.nikka.core.model.TaskGroup
 import com.nikka.core.ui.theme.DarkBackground
-import com.nikka.core.ui.theme.GroupColors
 import com.nikka.core.ui.theme.LavenderPrimary
 import com.nikka.core.ui.theme.StatusGreen
 import com.nikka.core.ui.theme.StatusRed
@@ -131,7 +130,7 @@ private fun HomeContent(
                     onResetGroup = { onResetGroup(group.id) },
                 )
             }
-            item { Spacer(modifier = Modifier.height(16.dp)) }
+            item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
 }
@@ -224,7 +223,6 @@ private fun GroupCard(
     onRemoveGroup: () -> Unit,
     onResetGroup: () -> Unit,
 ) {
-    val accentColor = GroupColors[group.colorIndex % GroupColors.size]
     val allCompleted = tasks.isNotEmpty() && tasks.all { it.isCompleted }
 
     Column(
@@ -237,7 +235,6 @@ private fun GroupCard(
     ) {
         GroupCardHeader(
             group = group,
-            accentColor = accentColor,
             allCompleted = allCompleted,
             isCollapsed = isCollapsed,
             onToggleCollapse = onToggleCollapse,
@@ -248,7 +245,6 @@ private fun GroupCard(
         if (!isCollapsed) {
             GroupCardBody(
                 tasks = tasks,
-                accentColor = accentColor,
                 onToggleTask = onToggleTask,
                 onRemoveTask = onRemoveTask,
             )
@@ -259,7 +255,6 @@ private fun GroupCard(
 @Composable
 private fun GroupCardHeader(
     group: TaskGroup,
-    accentColor: androidx.compose.ui.graphics.Color,
     allCompleted: Boolean,
     isCollapsed: Boolean,
     onToggleCollapse: () -> Unit,
@@ -284,7 +279,7 @@ private fun GroupCardHeader(
                 },
                 contentDescription = if (isCollapsed) "展開" else "折りたたみ",
                 modifier = Modifier.size(20.dp),
-                tint = accentColor,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Box(
                 modifier = Modifier
@@ -307,7 +302,7 @@ private fun GroupCardHeader(
                 )
             }
             TextButton(onClick = onAddTask) {
-                Text("+ 追加", color = accentColor)
+                Text("+ 追加", color = MaterialTheme.colorScheme.primary)
             }
             IconButton(onClick = onRemoveGroup, modifier = Modifier.size(28.dp)) {
                 Text(
@@ -323,7 +318,6 @@ private fun GroupCardHeader(
 @Composable
 private fun GroupCardBody(
     tasks: List<DailyTask>,
-    accentColor: androidx.compose.ui.graphics.Color,
     onToggleTask: (String) -> Unit,
     onRemoveTask: (String) -> Unit,
 ) {
@@ -339,7 +333,6 @@ private fun GroupCardBody(
             tasks.forEach { task ->
                 TaskRow(
                     task = task,
-                    accentColor = accentColor,
                     onToggle = { onToggleTask(task.id) },
                     onRemove = { onRemoveTask(task.id) },
                 )
@@ -351,7 +344,6 @@ private fun GroupCardBody(
 @Composable
 private fun TaskRow(
     task: DailyTask,
-    accentColor: androidx.compose.ui.graphics.Color,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -367,8 +359,8 @@ private fun TaskRow(
             checked = task.isCompleted,
             onCheckedChange = { onToggle() },
             colors = CheckboxDefaults.colors(
-                checkedColor = accentColor,
-                uncheckedColor = accentColor.copy(alpha = 0.5f),
+                checkedColor = MaterialTheme.colorScheme.primary,
+                uncheckedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
             ),
         )
         Text(

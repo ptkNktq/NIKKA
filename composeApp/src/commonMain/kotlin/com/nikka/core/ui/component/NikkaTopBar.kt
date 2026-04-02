@@ -59,11 +59,6 @@ fun NikkaTopBarContent(
                     ),
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
-                Text(
-                    text = "にっか",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
