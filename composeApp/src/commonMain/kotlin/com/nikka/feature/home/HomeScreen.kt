@@ -58,6 +58,8 @@ import com.nikka.core.model.TaskGroup
 import com.nikka.core.ui.theme.DarkBackground
 import com.nikka.core.ui.theme.GroupColors
 import com.nikka.core.ui.theme.LavenderPrimary
+import com.nikka.core.ui.theme.StatusGreen
+import com.nikka.core.ui.theme.StatusRed
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -69,15 +71,7 @@ fun HomeScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(DarkBackground)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            topBar {
-                IconButton(onClick = { viewModel.resetAllTasks() }) {
-                    Icon(
-                        imageVector = Icons.Rounded.Refresh,
-                        contentDescription = "リセット",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            topBar {}
             HomeContent(
                 uiState = uiState,
                 onToggleTask = viewModel::toggleTask,
@@ -85,6 +79,7 @@ fun HomeScreen(
                 onRemoveTask = viewModel::removeTask,
                 onRemoveGroup = viewModel::removeGroup,
                 onToggleGroupCollapse = viewModel::toggleGroupCollapse,
+                onResetGroup = viewModel::resetGroupTasks,
             )
         }
         FloatingActionButton(
@@ -112,6 +107,7 @@ private fun HomeContent(
     onRemoveTask: (String) -> Unit,
     onRemoveGroup: (String) -> Unit,
     onToggleGroupCollapse: (String) -> Unit,
+    onResetGroup: (String) -> Unit,
 ) {
     if (uiState.groups.isEmpty()) {
         EmptyState()
@@ -132,6 +128,7 @@ private fun HomeContent(
                     onAddTask = { onShowAddTask(group.id) },
                     onRemoveTask = onRemoveTask,
                     onRemoveGroup = { onRemoveGroup(group.id) },
+                    onResetGroup = { onResetGroup(group.id) },
                 )
             }
             item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -201,8 +198,10 @@ private fun GroupCard(
     onAddTask: () -> Unit,
     onRemoveTask: (String) -> Unit,
     onRemoveGroup: () -> Unit,
+    onResetGroup: () -> Unit,
 ) {
     val accentColor = GroupColors[group.colorIndex % GroupColors.size]
+    val allCompleted = tasks.isNotEmpty() && tasks.all { it.isCompleted }
 
     Column(
         modifier = Modifier
@@ -215,11 +214,11 @@ private fun GroupCard(
         GroupCardHeader(
             group = group,
             accentColor = accentColor,
-            completedCount = tasks.count { it.isCompleted },
-            totalCount = tasks.size,
+            allCompleted = allCompleted,
             isCollapsed = isCollapsed,
             onToggleCollapse = onToggleCollapse,
             onAddTask = onAddTask,
+            onResetGroup = onResetGroup,
             onRemoveGroup = onRemoveGroup,
         )
         if (!isCollapsed) {
@@ -237,11 +236,11 @@ private fun GroupCard(
 private fun GroupCardHeader(
     group: TaskGroup,
     accentColor: androidx.compose.ui.graphics.Color,
-    completedCount: Int,
-    totalCount: Int,
+    allCompleted: Boolean,
     isCollapsed: Boolean,
     onToggleCollapse: () -> Unit,
     onAddTask: () -> Unit,
+    onResetGroup: () -> Unit,
     onRemoveGroup: () -> Unit,
 ) {
     Row(
@@ -264,25 +263,29 @@ private fun GroupCardHeader(
                 tint = accentColor,
             )
             Box(
-                modifier = Modifier.size(12.dp).clip(CircleShape).background(accentColor),
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(if (allCompleted) StatusGreen else StatusRed),
             )
             Text(
                 text = group.name,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             )
-            if (totalCount > 0) {
-                Text(
-                    text = "$completedCount / $totalCount",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onResetGroup, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    imageVector = Icons.Rounded.Refresh,
+                    contentDescription = "リセット",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-        Row {
             TextButton(onClick = onAddTask) {
                 Text("+ 追加", color = accentColor)
             }
-            IconButton(onClick = onRemoveGroup, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = onRemoveGroup, modifier = Modifier.size(28.dp)) {
                 Text(
                     "×",
                     style = MaterialTheme.typography.titleMedium,

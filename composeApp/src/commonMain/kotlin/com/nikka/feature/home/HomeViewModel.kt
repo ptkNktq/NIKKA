@@ -116,10 +116,12 @@ class HomeViewModel(
         }
     }
 
-    fun resetAllTasks() {
+    fun resetGroupTasks(groupId: String) {
         _uiState.update { state ->
             state.copy(
-                tasks = state.tasks.map { it.copy(isCompleted = false) },
+                tasks = state.tasks.map { task ->
+                    if (task.groupId == groupId) task.copy(isCompleted = false) else task
+                },
             )
         }
         persistTasks()

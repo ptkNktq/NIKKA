@@ -27,6 +27,10 @@ val DarkSurfaceContainer = Color(0xFF2D2A35)
 val TextPrimary = Color(0xFFE2DDE8)
 val TextSecondary = Color(0xFF9E98A8)
 
+// Status indicators
+val StatusGreen = Color(0xFF6BBE6B)
+val StatusRed = Color(0xFFBE6B6B)
+
 // Accent colors for groups
 val GroupLavender = Color(0xFF9B8ABE)
 val GroupPeriwinkle = Color(0xFF8A96BE)
