@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -61,43 +60,69 @@ fun HomeScreen(
     ) {
         NikkaTopBar(
             actions = {
-                Button(
-                    onClick = { viewModel.showAddGroupDialog() },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = PastelPink,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    Text("+ グループ追加")
-                }
+                AddGroupButton(onClick = { viewModel.showAddGroupDialog() })
             },
         )
-
-        if (uiState.groups.isEmpty()) {
-            EmptyState()
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(uiState.groups, key = { it.id }) { group ->
-                    GroupCard(
-                        group = group,
-                        tasks = uiState.tasks.filter { it.groupId == group.id },
-                        onToggleTask = viewModel::toggleTask,
-                        onAddTask = { viewModel.showAddTaskDialog(group.id) },
-                        onRemoveTask = viewModel::removeTask,
-                        onRemoveGroup = { viewModel.removeGroup(group.id) },
-                    )
-                }
-                item { Spacer(modifier = Modifier.height(16.dp)) }
-            }
-        }
+        HomeContent(
+            uiState = uiState,
+            onToggleTask = viewModel::toggleTask,
+            onShowAddTask = viewModel::showAddTaskDialog,
+            onRemoveTask = viewModel::removeTask,
+            onRemoveGroup = viewModel::removeGroup,
+        )
     }
 
+    HomeDialogs(uiState = uiState, viewModel = viewModel)
+}
+
+@Composable
+private fun AddGroupButton(onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = PastelPink,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Text("+ グループ追加")
+    }
+}
+
+@Composable
+private fun HomeContent(
+    uiState: HomeUiState,
+    onToggleTask: (String) -> Unit,
+    onShowAddTask: (String) -> Unit,
+    onRemoveTask: (String) -> Unit,
+    onRemoveGroup: (String) -> Unit,
+) {
+    if (uiState.groups.isEmpty()) {
+        EmptyState()
+    } else {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(uiState.groups, key = { it.id }) { group ->
+                GroupCard(
+                    group = group,
+                    tasks = uiState.tasks.filter { it.groupId == group.id },
+                    onToggleTask = onToggleTask,
+                    onAddTask = { onShowAddTask(group.id) },
+                    onRemoveTask = onRemoveTask,
+                    onRemoveGroup = { onRemoveGroup(group.id) },
+                )
+            }
+            item { Spacer(modifier = Modifier.height(16.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun HomeDialogs(uiState: HomeUiState, viewModel: HomeViewModel) {
     if (uiState.isAddGroupDialogVisible) {
         InputDialog(
             title = "グループを追加",
@@ -107,7 +132,6 @@ fun HomeScreen(
             onDismiss = viewModel::dismissAddGroupDialog,
         )
     }
-
     if (uiState.isAddTaskDialogVisible && uiState.addTaskTargetGroupId != null) {
         InputDialog(
             title = "日課を追加",
@@ -157,8 +181,6 @@ private fun GroupCard(
     onRemoveGroup: () -> Unit,
 ) {
     val accentColor = GroupColors[group.colorIndex % GroupColors.size]
-    val completedCount = tasks.count { it.isCompleted }
-    val totalCount = tasks.size
 
     Column(
         modifier = Modifier
@@ -168,69 +190,94 @@ private fun GroupCard(
             .animateContentSize()
             .padding(16.dp),
     ) {
+        GroupCardHeader(
+            group = group,
+            accentColor = accentColor,
+            completedCount = tasks.count { it.isCompleted },
+            totalCount = tasks.size,
+            onAddTask = onAddTask,
+            onRemoveGroup = onRemoveGroup,
+        )
+        GroupCardBody(
+            tasks = tasks,
+            accentColor = accentColor,
+            onToggleTask = onToggleTask,
+            onRemoveTask = onRemoveTask,
+        )
+    }
+}
+
+@Composable
+private fun GroupCardHeader(
+    group: TaskGroup,
+    accentColor: androidx.compose.ui.graphics.Color,
+    completedCount: Int,
+    totalCount: Int,
+    onAddTask: () -> Unit,
+    onRemoveGroup: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(accentColor),
-                )
+            Box(
+                modifier = Modifier.size(12.dp).clip(CircleShape).background(accentColor),
+            )
+            Text(
+                text = group.name,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            )
+            if (totalCount > 0) {
                 Text(
-                    text = group.name,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    text = "$completedCount / $totalCount",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (totalCount > 0) {
-                    Text(
-                        text = "$completedCount / $totalCount",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Row {
-                TextButton(onClick = onAddTask) {
-                    Text("+ 追加", color = accentColor)
-                }
-                IconButton(
-                    onClick = onRemoveGroup,
-                    modifier = Modifier.size(32.dp),
-                ) {
-                    Text(
-                        text = "×",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
         }
+        Row {
+            TextButton(onClick = onAddTask) {
+                Text("+ 追加", color = accentColor)
+            }
+            IconButton(onClick = onRemoveGroup, modifier = Modifier.size(32.dp)) {
+                Text(
+                    "×",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
 
-        if (tasks.isEmpty()) {
-            Text(
-                text = "日課を追加してみましょう ✨",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 22.dp, top = 4.dp),
-            )
-        } else {
-            Column(
-                modifier = Modifier.padding(top = 4.dp),
-            ) {
-                tasks.forEach { task ->
-                    TaskRow(
-                        task = task,
-                        accentColor = accentColor,
-                        onToggle = { onToggleTask(task.id) },
-                        onRemove = { onRemoveTask(task.id) },
-                    )
-                }
+@Composable
+private fun GroupCardBody(
+    tasks: List<DailyTask>,
+    accentColor: androidx.compose.ui.graphics.Color,
+    onToggleTask: (String) -> Unit,
+    onRemoveTask: (String) -> Unit,
+) {
+    if (tasks.isEmpty()) {
+        Text(
+            text = "日課を追加してみましょう ✨",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 22.dp, top = 4.dp),
+        )
+    } else {
+        Column(modifier = Modifier.padding(top = 4.dp)) {
+            tasks.forEach { task ->
+                TaskRow(
+                    task = task,
+                    accentColor = accentColor,
+                    onToggle = { onToggleTask(task.id) },
+                    onRemove = { onRemoveTask(task.id) },
+                )
             }
         }
     }
