@@ -5,17 +5,17 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 
 private val NikkaColorScheme = darkColorScheme(
-    primary = TealPrimary,
+    primary = LavenderPrimary,
     onPrimary = TextPrimary,
-    primaryContainer = TealPrimaryDark,
+    primaryContainer = LavenderPrimaryDark,
     onPrimaryContainer = TextPrimary,
-    secondary = SageSecondary,
+    secondary = MauveSecondary,
     onSecondary = TextPrimary,
-    secondaryContainer = SageSecondaryDark,
+    secondaryContainer = MauveSecondaryDark,
     onSecondaryContainer = TextPrimary,
-    tertiary = LavenderAccent,
+    tertiary = PeriwinkleAccent,
     onTertiary = TextPrimary,
-    tertiaryContainer = LavenderAccentDark,
+    tertiaryContainer = PeriwinkleAccentDark,
     onTertiaryContainer = TextPrimary,
     background = DarkBackground,
     onBackground = TextPrimary,
@@ -23,7 +23,7 @@ private val NikkaColorScheme = darkColorScheme(
     onSurface = TextPrimary,
     surfaceVariant = DarkSurfaceVariant,
     onSurfaceVariant = TextSecondary,
-    outline = TealPrimaryDark,
+    outline = LavenderPrimaryDark,
     outlineVariant = DarkSurfaceVariant,
 )
 

@@ -50,7 +50,7 @@ import com.nikka.core.model.DailyTask
 import com.nikka.core.model.TaskGroup
 import com.nikka.core.ui.theme.GroupColors
 import com.nikka.core.ui.theme.DarkBackground
-import com.nikka.core.ui.theme.TealPrimary
+import com.nikka.core.ui.theme.LavenderPrimary
 
 @Composable
 fun HomeScreen(
@@ -82,7 +82,7 @@ private fun AddGroupButton(onClick: () -> Unit) {
     Button(
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(
-            containerColor = TealPrimary,
+            containerColor = LavenderPrimary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
         ),
         shape = RoundedCornerShape(12.dp),
@@ -362,15 +362,15 @@ private fun InputDialog(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = TealPrimary,
-                    cursorColor = TealPrimary,
+                    focusedBorderColor = LavenderPrimary,
+                    cursorColor = LavenderPrimary,
                 ),
             )
         },
         confirmButton = {
             Button(
                 onClick = { onConfirm(text) },
-                colors = ButtonDefaults.buttonColors(containerColor = TealPrimary),
+                colors = ButtonDefaults.buttonColors(containerColor = LavenderPrimary),
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Text(confirmText)
