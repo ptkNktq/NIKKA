@@ -1,30 +1,30 @@
 package com.nikka.core.ui.theme
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 
-private val NikkaColorScheme = lightColorScheme(
-    primary = PastelPink,
-    onPrimary = TextOnLight,
-    primaryContainer = PastelPinkLight,
-    onPrimaryContainer = TextOnLight,
-    secondary = PastelLavender,
-    onSecondary = TextOnLight,
-    secondaryContainer = PastelLavenderLight,
-    onSecondaryContainer = TextOnLight,
-    tertiary = PastelMint,
-    onTertiary = TextOnLight,
-    tertiaryContainer = PastelMintLight,
-    onTertiaryContainer = TextOnLight,
-    background = PastelBackground,
-    onBackground = TextOnLight,
-    surface = PastelSurface,
-    onSurface = TextOnLight,
-    surfaceVariant = PastelSurfaceVariant,
-    onSurfaceVariant = TextOnLightVariant,
-    outline = PastelPinkDark,
-    outlineVariant = PastelPinkLight,
+private val NikkaColorScheme = darkColorScheme(
+    primary = TealPrimary,
+    onPrimary = TextPrimary,
+    primaryContainer = TealPrimaryDark,
+    onPrimaryContainer = TextPrimary,
+    secondary = SageSecondary,
+    onSecondary = TextPrimary,
+    secondaryContainer = SageSecondaryDark,
+    onSecondaryContainer = TextPrimary,
+    tertiary = LavenderAccent,
+    onTertiary = TextPrimary,
+    tertiaryContainer = LavenderAccentDark,
+    onTertiaryContainer = TextPrimary,
+    background = DarkBackground,
+    onBackground = TextPrimary,
+    surface = DarkSurface,
+    onSurface = TextPrimary,
+    surfaceVariant = DarkSurfaceVariant,
+    onSurfaceVariant = TextSecondary,
+    outline = TealPrimaryDark,
+    outlineVariant = DarkSurfaceVariant,
 )
 
 @Composable

@@ -2,43 +2,46 @@ package com.nikka.core.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary - Soft Pink
-val PastelPink = Color(0xFFFFB6C1)
-val PastelPinkLight = Color(0xFFFFD9E0)
-val PastelPinkDark = Color(0xFFE891A3)
+// Primary - Muted Teal
+val TealPrimary = Color(0xFF6DB5A0)
+val TealPrimaryLight = Color(0xFF8AC8B5)
+val TealPrimaryDark = Color(0xFF4E9A83)
 
-// Secondary - Soft Lavender
-val PastelLavender = Color(0xFFD4B5FF)
-val PastelLavenderLight = Color(0xFFEAD6FF)
-val PastelLavenderDark = Color(0xFFB794E0)
+// Secondary - Muted Sage
+val SageSecondary = Color(0xFF8AAF98)
+val SageSecondaryLight = Color(0xFFA3C4AF)
+val SageSecondaryDark = Color(0xFF6E9580)
 
-// Tertiary - Soft Mint
-val PastelMint = Color(0xFFA8E6CF)
-val PastelMintLight = Color(0xFFC8F5E0)
-val PastelMintDark = Color(0xFF88D4B0)
+// Tertiary - Muted Lavender (accent)
+val LavenderAccent = Color(0xFF9E8FBE)
+val LavenderAccentLight = Color(0xFFB5A8D0)
+val LavenderAccentDark = Color(0xFF8475A5)
 
-// Background & Surface
-val PastelBackground = Color(0xFFFFF5F7)
-val PastelSurface = Color(0xFFFFFFFF)
-val PastelSurfaceVariant = Color(0xFFFFF0F3)
-val PastelSurfaceContainer = Color(0xFFFFF8FA)
+// Background & Surface - Dark cool tones
+val DarkBackground = Color(0xFF1E2624)
+val DarkSurface = Color(0xFF283330)
+val DarkSurfaceVariant = Color(0xFF303D39)
+val DarkSurfaceContainer = Color(0xFF243028)
 
 // Text
-val TextOnLight = Color(0xFF4A3B42)
-val TextOnLightVariant = Color(0xFF8A7580)
+val TextPrimary = Color(0xFFDDE8E4)
+val TextSecondary = Color(0xFF94A8A0)
 
 // Accent colors for groups
-val PastelYellow = Color(0xFFFFE5A0)
-val PastelPeach = Color(0xFFFFCBA4)
-val PastelSky = Color(0xFFA4D4FF)
-val PastelRose = Color(0xFFFFABCF)
+val GroupTeal = Color(0xFF6DB5A0)
+val GroupLavender = Color(0xFF9E8FBE)
+val GroupPeach = Color(0xFFCB9E7E)
+val GroupSky = Color(0xFF7AADCA)
+val GroupRose = Color(0xFFBE8F9E)
+val GroupYellow = Color(0xFFBDB06A)
+val GroupMint = Color(0xFF6DBDA5)
 
 val GroupColors = listOf(
-    PastelPink,
-    PastelLavender,
-    PastelMint,
-    PastelYellow,
-    PastelPeach,
-    PastelSky,
-    PastelRose,
+    GroupTeal,
+    GroupLavender,
+    GroupPeach,
+    GroupSky,
+    GroupRose,
+    GroupYellow,
+    GroupMint,
 )

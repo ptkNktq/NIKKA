@@ -46,8 +46,8 @@ import com.nikka.core.model.DailyTask
 import com.nikka.core.model.TaskGroup
 import com.nikka.core.ui.component.NikkaTopBar
 import com.nikka.core.ui.theme.GroupColors
-import com.nikka.core.ui.theme.PastelBackground
-import com.nikka.core.ui.theme.PastelPink
+import com.nikka.core.ui.theme.DarkBackground
+import com.nikka.core.ui.theme.TealPrimary
 
 @Composable
 fun HomeScreen(
@@ -56,7 +56,7 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     Column(
-        modifier = Modifier.fillMaxSize().background(PastelBackground),
+        modifier = Modifier.fillMaxSize().background(DarkBackground),
     ) {
         NikkaTopBar(
             actions = {
@@ -80,7 +80,7 @@ private fun AddGroupButton(onClick: () -> Unit) {
     Button(
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(
-            containerColor = PastelPink,
+            containerColor = TealPrimary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
         ),
         shape = RoundedCornerShape(12.dp),
@@ -356,15 +356,15 @@ private fun InputDialog(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = PastelPink,
-                    cursorColor = PastelPink,
+                    focusedBorderColor = TealPrimary,
+                    cursorColor = TealPrimary,
                 ),
             )
         },
         confirmButton = {
             Button(
                 onClick = { onConfirm(text) },
-                colors = ButtonDefaults.buttonColors(containerColor = PastelPink),
+                colors = ButtonDefaults.buttonColors(containerColor = TealPrimary),
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Text(confirmText)

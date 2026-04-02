@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.nikka.core.ui.theme.PastelPinkLight
+import com.nikka.core.ui.theme.DarkSurfaceVariant
 
 @Composable
 fun NikkaTopBar(
@@ -27,7 +27,7 @@ fun NikkaTopBar(
             .fillMaxWidth()
             .shadow(4.dp, RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp))
             .background(
-                color = PastelPinkLight,
+                color = DarkSurfaceVariant,
                 shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
             )
             .padding(horizontal = 20.dp, vertical = 14.dp),
