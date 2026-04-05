@@ -55,22 +55,24 @@
 
 ```bash
 # ビルド
-./gradlew assemble
+./gradlew assemble                    # WSL
+gradlew.bat assemble                  # Windows
 
-# 実行 (Windows)
-gradlew.bat composeApp:run
-
-# 実行 (WSL, X11 転送)
-DISPLAY=:0 ./gradlew composeApp:run
+# 実行
+DISPLAY=:0 ./gradlew composeApp:run   # WSL (X11 転送)
+gradlew.bat composeApp:run            # Windows
 
 # テスト
-./gradlew :feature:home:desktopTest
+./gradlew :feature:home:desktopTest :core:data:desktopTest   # WSL
+gradlew.bat :feature:home:desktopTest :core:data:desktopTest # Windows
 
 # Lint
-./gradlew detekt
+./gradlew detekt                      # WSL
+gradlew.bat detekt                    # Windows
 
 # Lint 自動修正
-./gradlew detekt --auto-correct
+./gradlew detekt --auto-correct       # WSL
+gradlew.bat detekt --auto-correct     # Windows
 ```
 
 ## データ保存先
