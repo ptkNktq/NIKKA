@@ -1,0 +1,10 @@
+package com.nikka.core.data
+
+import com.nikka.core.model.DailyTask
+import com.nikka.core.model.TaskGroup
+
+interface TaskRepository {
+    suspend fun loadGroups(): List<TaskGroup>
+    suspend fun loadTasks(): List<DailyTask>
+    suspend fun saveAll(groups: List<TaskGroup>, tasks: List<DailyTask>)
+}
