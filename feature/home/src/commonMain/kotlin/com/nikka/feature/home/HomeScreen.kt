@@ -54,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -102,6 +103,7 @@ fun HomeScreen(
                 onToggleGroupCollapse = viewModel::toggleGroupCollapse,
                 onResetGroup = viewModel::resetGroupTasks,
                 onMoveGroup = viewModel::moveGroup,
+                onSettleDrag = viewModel::settleDrag,
                 onMoveTask = viewModel::moveTask,
                 onSetResetHour = viewModel::showResetHourDialog,
             )
@@ -133,6 +135,7 @@ private fun HomeContent(
     onToggleGroupCollapse: (String) -> Unit,
     onResetGroup: (String) -> Unit,
     onMoveGroup: (Int, Int) -> Unit,
+    onSettleDrag: () -> Unit,
     onMoveTask: (String, Int, Int) -> Unit,
     onSetResetHour: (String) -> Unit,
 ) {
@@ -165,7 +168,9 @@ private fun HomeContent(
                         onResetGroup = { onResetGroup(group.id) },
                         onSetResetHour = { onSetResetHour(group.id) },
                         onMoveTask = onMoveTask,
-                        dragModifier = Modifier.draggableHandle(),
+                        dragModifier = Modifier.draggableHandle(
+                            onDragStopped = { onSettleDrag() },
+                        ),
                     )
                 }
             }
@@ -552,13 +557,15 @@ private fun GroupCardBody(
             },
             modifier = Modifier.padding(top = 4.dp),
         ) { _, task, _ ->
-            ReorderableItem {
-                TaskRow(
-                    task = task,
-                    onToggle = { onToggleTask(task.id) },
-                    onRemove = { onRemoveTask(task.id) },
-                    dragModifier = Modifier.draggableHandle(),
-                )
+            key(task.id) {
+                ReorderableItem {
+                    TaskRow(
+                        task = task,
+                        onToggle = { onToggleTask(task.id) },
+                        onRemove = { onRemoveTask(task.id) },
+                        dragModifier = Modifier.draggableHandle(),
+                    )
+                }
             }
         }
     }
