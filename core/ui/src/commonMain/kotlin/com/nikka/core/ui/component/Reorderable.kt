@@ -154,8 +154,9 @@ class ReorderState {
     companion object {
         private const val SETTLE_DURATION_MS = 200
         internal const val SCROLL_ZONE_FRACTION = 0.25f
-        internal const val SCROLL_SPEED_PX = 12f
+        internal const val SCROLL_SPEED_PX = 8f
         internal const val SCROLL_INTERVAL_MS = 16L
+        internal const val VIEWPORT_MARGIN = 40f
     }
 }
 
@@ -176,15 +177,27 @@ fun rememberReorderState(lazyListState: LazyListState? = null): ReorderState {
                         .find { it.index == state.draggedIndex }
                     if (draggedItem != null) {
                         val itemCenter = draggedItem.offset + draggedItem.size / 2 + state.dragOffset
-                        val scrollAmount = when {
+                        val itemTop = draggedItem.offset + state.dragOffset
+                        val itemBottom = itemTop + draggedItem.size
+                        val rawScroll = when {
                             itemCenter < scrollZone && lazyListState.canScrollBackward ->
                                 -ReorderState.SCROLL_SPEED_PX
                             itemCenter > viewportHeight - scrollZone && lazyListState.canScrollForward ->
                                 ReorderState.SCROLL_SPEED_PX
                             else -> 0f
                         }
-                        if (scrollAmount != 0f) {
-                            val scrolled = lazyListState.scrollBy(scrollAmount)
+                        // ドラッグ中のアイテムがビューポート外に出ないよう制限
+                        val safeScroll = when {
+                            rawScroll > 0 -> rawScroll.coerceAtMost(
+                                (itemTop - ReorderState.VIEWPORT_MARGIN).coerceAtLeast(0f),
+                            )
+                            rawScroll < 0 -> rawScroll.coerceAtLeast(
+                                -(viewportHeight - itemBottom - ReorderState.VIEWPORT_MARGIN).coerceAtLeast(0f),
+                            )
+                            else -> 0f
+                        }
+                        if (safeScroll != 0f) {
+                            val scrolled = lazyListState.scrollBy(safeScroll)
                             state.adjustForScroll(scrolled)
                         }
                     }
