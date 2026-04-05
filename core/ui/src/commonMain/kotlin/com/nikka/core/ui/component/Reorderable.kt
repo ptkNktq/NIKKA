@@ -5,13 +5,16 @@ package com.nikka.core.ui.component
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -21,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.graphicsLayer
@@ -28,6 +32,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class ReorderState {
@@ -119,11 +124,46 @@ class ReorderState {
 
     companion object {
         private const val SETTLE_DURATION_MS = 200
+        internal const val SCROLL_ZONE_FRACTION = 0.15f
+        internal const val SCROLL_SPEED_PX = 12f
+        internal const val SCROLL_INTERVAL_MS = 16L
     }
 }
 
 @Composable
-fun rememberReorderState(): ReorderState = remember { ReorderState() }
+fun rememberReorderState(lazyListState: LazyListState? = null): ReorderState {
+    val state = remember { ReorderState() }
+
+    if (lazyListState != null) {
+        LaunchedEffect(Unit) {
+            snapshotFlow { state.isDragging }.collect { dragging ->
+                if (!dragging) return@collect
+                while (state.isDragging) {
+                    val layoutInfo = lazyListState.layoutInfo
+                    val viewportHeight = layoutInfo.viewportSize.height
+                    val scrollZone = viewportHeight * ReorderState.SCROLL_ZONE_FRACTION
+                    val draggedItem = layoutInfo.visibleItemsInfo
+                        .find { it.index == state.draggedIndex }
+                    if (draggedItem != null) {
+                        val itemTop = draggedItem.offset + state.dragOffset
+                        val itemBottom = itemTop + draggedItem.size
+                        val scrollAmount = when {
+                            itemTop < scrollZone -> -ReorderState.SCROLL_SPEED_PX
+                            itemBottom > viewportHeight - scrollZone -> ReorderState.SCROLL_SPEED_PX
+                            else -> 0f
+                        }
+                        if (scrollAmount != 0f) {
+                            lazyListState.scrollBy(scrollAmount)
+                        }
+                    }
+                    delay(ReorderState.SCROLL_INTERVAL_MS)
+                }
+            }
+        }
+    }
+
+    return state
+}
 
 fun Modifier.reorderableItem(
     state: ReorderState,
