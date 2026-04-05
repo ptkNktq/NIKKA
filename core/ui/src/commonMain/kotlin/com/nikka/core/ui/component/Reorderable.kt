@@ -53,13 +53,16 @@ class ReorderState {
     internal suspend fun endDrag() {
         if (draggedIndex < 0) return
         isAnimating = true
-        animate(dragOffset, 0f, animationSpec = tween(SETTLE_DURATION_MS)) { value, _ ->
-            dragOffset = value
+        try {
+            animate(dragOffset, 0f, animationSpec = tween(SETTLE_DURATION_MS)) { value, _ ->
+                dragOffset = value
+            }
+        } finally {
+            draggedIndex = -1
+            dragOffset = 0f
+            lastSwapDirection = 0
+            isAnimating = false
         }
-        draggedIndex = -1
-        dragOffset = 0f
-        lastSwapDirection = 0
-        isAnimating = false
     }
 
     internal fun onDrag(

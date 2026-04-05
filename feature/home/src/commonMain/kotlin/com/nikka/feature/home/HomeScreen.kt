@@ -155,6 +155,7 @@ private fun HomeContent(
         ) {
             itemsIndexed(uiState.groups, key = { _, g -> g.id }) { index, group ->
                 GroupCard(
+                    // placementSpec = null: D&D の手動 translationY と競合するため配置アニメーション無効
                     modifier = Modifier.animateItem(placementSpec = null),
                     group = group,
                     tasks = uiState.tasks.filter { it.groupId == group.id },
