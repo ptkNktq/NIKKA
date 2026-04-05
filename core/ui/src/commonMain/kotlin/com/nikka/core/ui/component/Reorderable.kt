@@ -31,6 +31,7 @@ class ReorderState {
     var dragOffset by mutableFloatStateOf(0f)
         internal set
     internal val itemHeights = mutableStateMapOf<Int, Float>()
+    internal var lastSwapDirection by mutableIntStateOf(0)
 
     val isDragging: Boolean get() = draggedIndex >= 0
 }
@@ -75,29 +76,37 @@ fun DragHandle(
                     onDragStart = {
                         state.draggedIndex = currentIndex
                         state.dragOffset = 0f
+                        state.lastSwapDirection = 0
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
                         state.dragOffset += dragAmount.y
                         val height = state.itemHeights[state.draggedIndex] ?: return@detectDragGestures
                         if (height <= 0f) return@detectDragGestures
+                        if ((state.lastSwapDirection > 0 && state.dragOffset <= 0) ||
+                            (state.lastSwapDirection < 0 && state.dragOffset >= 0)
+                        ) {
+                            state.lastSwapDirection = 0
+                        }
                         when {
-                            state.dragOffset > 0 && state.draggedIndex < currentItemCount - 1 -> {
+                            state.dragOffset > 0 && state.draggedIndex < currentItemCount - 1 &&
+                                state.lastSwapDirection >= 0 -> {
                                 val nextHeight = state.itemHeights[state.draggedIndex + 1] ?: height
                                 if (state.dragOffset > nextHeight / 2) {
                                     currentOnMove(state.draggedIndex, state.draggedIndex + 1)
                                     state.draggedIndex++
-                                    state.dragOffset = (state.dragOffset - nextHeight)
-                                        .coerceAtLeast(0f)
+                                    state.dragOffset -= nextHeight
+                                    state.lastSwapDirection = 1
                                 }
                             }
-                            state.dragOffset < 0 && state.draggedIndex > 0 -> {
+                            state.dragOffset < 0 && state.draggedIndex > 0 &&
+                                state.lastSwapDirection <= 0 -> {
                                 val prevHeight = state.itemHeights[state.draggedIndex - 1] ?: height
                                 if (state.dragOffset < -prevHeight / 2) {
                                     currentOnMove(state.draggedIndex, state.draggedIndex - 1)
                                     state.draggedIndex--
-                                    state.dragOffset = (state.dragOffset + prevHeight)
-                                        .coerceAtMost(0f)
+                                    state.dragOffset += prevHeight
+                                    state.lastSwapDirection = -1
                                 }
                             }
                         }
@@ -105,10 +114,12 @@ fun DragHandle(
                     onDragEnd = {
                         state.draggedIndex = -1
                         state.dragOffset = 0f
+                        state.lastSwapDirection = 0
                     },
                     onDragCancel = {
                         state.draggedIndex = -1
                         state.dragOffset = 0f
+                        state.lastSwapDirection = 0
                     },
                 )
             },
