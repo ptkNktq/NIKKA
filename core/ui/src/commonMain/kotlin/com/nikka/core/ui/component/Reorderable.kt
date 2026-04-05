@@ -70,6 +70,7 @@ class ReorderState {
             dragOffset > 0 && draggedIndex < itemCount - 1 && lastSwapDirection >= 0 -> {
                 val nextHeight = itemHeights[draggedIndex + 1] ?: fallbackHeight
                 if (dragOffset > nextHeight / 2) {
+                    swapHeights(draggedIndex, draggedIndex + 1)
                     onMove(draggedIndex, draggedIndex + 1)
                     draggedIndex++
                     dragOffset -= nextHeight
@@ -79,6 +80,7 @@ class ReorderState {
             dragOffset < 0 && draggedIndex > 0 && lastSwapDirection <= 0 -> {
                 val prevHeight = itemHeights[draggedIndex - 1] ?: fallbackHeight
                 if (dragOffset < -prevHeight / 2) {
+                    swapHeights(draggedIndex, draggedIndex - 1)
                     onMove(draggedIndex, draggedIndex - 1)
                     draggedIndex--
                     dragOffset += prevHeight
@@ -86,6 +88,13 @@ class ReorderState {
                 }
             }
         }
+    }
+
+    private fun swapHeights(indexA: Int, indexB: Int) {
+        val heightA = itemHeights[indexA]
+        val heightB = itemHeights[indexB]
+        if (heightA != null) itemHeights[indexB] = heightA
+        if (heightB != null) itemHeights[indexA] = heightB
     }
 }
 
