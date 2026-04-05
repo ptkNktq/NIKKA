@@ -81,7 +81,9 @@ class ReorderState {
     ) {
         currentItemCount = itemCount
         currentOnMove = onMove
+        val oldOffset = dragOffset
         dragOffset += deltaY
+        resetDirectionLockOnDrag(oldOffset)
         checkSwap()
     }
 
@@ -89,19 +91,17 @@ class ReorderState {
         dragOffset += scrolled
     }
 
+    private fun resetDirectionLockOnDrag(oldOffset: Float) {
+        val crossedZero = (oldOffset > 0 && dragOffset <= 0) || (oldOffset < 0 && dragOffset >= 0)
+        if (crossedZero) lastSwapDirection = 0
+    }
+
     private fun checkSwap() {
         val height = itemHeights[draggedIndex] ?: return
         val onMove = currentOnMove ?: return
         if (height > 0f) {
-            resetDirectionLockIfCrossedZero()
             trySwap(currentItemCount, height, onMove)
         }
-    }
-
-    private fun resetDirectionLockIfCrossedZero() {
-        val shouldReset = (lastSwapDirection > 0 && dragOffset <= 0) ||
-            (lastSwapDirection < 0 && dragOffset >= 0)
-        if (shouldReset) lastSwapDirection = 0
     }
 
     private fun trySwap(itemCount: Int, fallbackHeight: Float, onMove: (Int, Int) -> Unit) {
