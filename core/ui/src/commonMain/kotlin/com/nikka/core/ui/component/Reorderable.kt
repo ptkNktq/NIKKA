@@ -45,6 +45,7 @@ class ReorderState {
     val isDragging: Boolean get() = draggedIndex >= 0
 
     internal fun startDrag(index: Int) {
+        if (isAnimating) return
         draggedIndex = index
         dragOffset = 0f
         lastSwapDirection = 0
@@ -110,8 +111,10 @@ class ReorderState {
     private fun swapHeights(indexA: Int, indexB: Int) {
         val heightA = itemHeights[indexA]
         val heightB = itemHeights[indexB]
-        if (heightA != null) itemHeights[indexB] = heightA
-        if (heightB != null) itemHeights[indexA] = heightB
+        if (heightA != null && heightB != null) {
+            itemHeights[indexA] = heightB
+            itemHeights[indexB] = heightA
+        }
     }
 
     companion object {
