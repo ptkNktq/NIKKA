@@ -41,6 +41,7 @@ class ReorderState {
     var dragOffset by mutableFloatStateOf(0f)
         internal set
     internal val itemHeights = mutableStateMapOf<Int, Float>()
+    internal var lazyListState: LazyListState? = null
     private var lastSwapDirection by mutableIntStateOf(0)
     private var currentItemCount by mutableIntStateOf(0)
     private var currentOnMove: ((Int, Int) -> Unit)? = null
@@ -107,25 +108,34 @@ class ReorderState {
         when {
             dragOffset > 0 && draggedIndex < itemCount - 1 && lastSwapDirection >= 0 -> {
                 val nextHeight = itemHeights[draggedIndex + 1] ?: fallbackHeight
+                val slotDistance = getSlotDistance(draggedIndex, draggedIndex + 1) ?: nextHeight
                 if (dragOffset > nextHeight / 2) {
                     swapHeights(draggedIndex, draggedIndex + 1)
                     onMove(draggedIndex, draggedIndex + 1)
                     draggedIndex++
-                    dragOffset -= nextHeight
+                    dragOffset -= slotDistance
                     lastSwapDirection = 1
                 }
             }
             dragOffset < 0 && draggedIndex > 0 && lastSwapDirection <= 0 -> {
                 val prevHeight = itemHeights[draggedIndex - 1] ?: fallbackHeight
+                val slotDistance = getSlotDistance(draggedIndex, draggedIndex - 1) ?: prevHeight
                 if (dragOffset < -prevHeight / 2) {
                     swapHeights(draggedIndex, draggedIndex - 1)
                     onMove(draggedIndex, draggedIndex - 1)
                     draggedIndex--
-                    dragOffset += prevHeight
+                    dragOffset += slotDistance
                     lastSwapDirection = -1
                 }
             }
         }
+    }
+
+    private fun getSlotDistance(fromIndex: Int, toIndex: Int): Float? {
+        val items = lazyListState?.layoutInfo?.visibleItemsInfo ?: return null
+        val fromItem = items.find { it.index == fromIndex } ?: return null
+        val toItem = items.find { it.index == toIndex } ?: return null
+        return kotlin.math.abs(toItem.offset - fromItem.offset).toFloat()
     }
 
     private fun swapHeights(indexA: Int, indexB: Int) {
@@ -148,6 +158,7 @@ class ReorderState {
 @Composable
 fun rememberReorderState(lazyListState: LazyListState? = null): ReorderState {
     val state = remember { ReorderState() }
+    state.lazyListState = lazyListState
 
     if (lazyListState != null) {
         LaunchedEffect(Unit) {
