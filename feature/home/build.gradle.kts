@@ -20,6 +20,7 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.materialIconsExtended)
 
+            implementation(libs.reorderable)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime)
             implementation(libs.lifecycle.viewmodel.compose)

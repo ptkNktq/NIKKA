@@ -166,6 +166,9 @@ class HomeViewModel(
                 },
             )
         }
+    }
+
+    fun settleDrag() {
         persistAll()
     }
 
