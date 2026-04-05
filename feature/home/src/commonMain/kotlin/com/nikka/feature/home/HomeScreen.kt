@@ -5,7 +5,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.PointerMatcher
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -545,23 +544,25 @@ private fun GroupCardBody(
             modifier = Modifier.padding(start = 22.dp, top = 4.dp),
         )
     } else {
-        Column(modifier = Modifier.padding(top = 4.dp)) {
-            tasks.forEachIndexed { index, task ->
-                TaskRow(
-                    task = task,
-                    onToggle = { onToggleTask(task.id) },
-                    onRemove = { onRemoveTask(task.id) },
-                    onMoveUp = if (index > 0) {
-                        { onMoveTask(group.id, index, index - 1) }
-                    } else {
-                        null
-                    },
-                    onMoveDown = if (index < tasks.size - 1) {
-                        { onMoveTask(group.id, index, index + 1) }
-                    } else {
-                        null
-                    },
-                )
+        val taskLazyListState = rememberLazyListState()
+        val taskReorderableState = rememberReorderableLazyListState(taskLazyListState) { from, to ->
+            onMoveTask(group.id, from.index, to.index)
+        }
+        LazyColumn(
+            state = taskLazyListState,
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .height(TASK_ROW_HEIGHT * tasks.size),
+        ) {
+            items(tasks, key = { it.id }) { task ->
+                ReorderableItem(taskReorderableState, key = task.id) {
+                    TaskRow(
+                        task = task,
+                        onToggle = { onToggleTask(task.id) },
+                        onRemove = { onRemoveTask(task.id) },
+                        dragHandle = { Modifier.draggableHandle() },
+                    )
+                }
             }
         }
     }
@@ -573,19 +574,18 @@ private fun TaskRow(
     task: DailyTask,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
-    onMoveUp: (() -> Unit)?,
-    onMoveDown: (() -> Unit)?,
+    dragHandle: @Composable () -> Modifier,
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
     var contextMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
     var lastPointerPosition by remember { mutableStateOf(Offset.Zero) }
-    var anchorHeight by remember { mutableStateOf(0) }
     val density = LocalDensity.current
 
-    Box(modifier = Modifier.onSizeChanged { anchorHeight = it.height }) {
+    Box {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(TASK_ROW_HEIGHT)
                 .clip(RoundedCornerShape(8.dp))
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
@@ -603,17 +603,21 @@ private fun TaskRow(
                         with(density) {
                             contextMenuOffset = DpOffset(
                                 lastPointerPosition.x.toDp(),
-                                lastPointerPosition.y.toDp() - anchorHeight.toDp(),
+                                lastPointerPosition.y.toDp() - TASK_ROW_HEIGHT.toPx().toDp(),
                             )
                         }
                         showContextMenu = true
                     },
                 )
-                .clickable(onClick = onToggle)
-                .padding(vertical = 2.dp),
+                .clickable(onClick = onToggle),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TaskDragHandle(onMoveUp = onMoveUp, onMoveDown = onMoveDown)
+            Icon(
+                imageVector = Icons.Rounded.DragIndicator,
+                contentDescription = "並べ替え",
+                modifier = Modifier.size(20.dp).then(dragHandle()),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             TaskRowContent(task = task, onToggle = onToggle)
         }
         TaskContextMenu(
@@ -651,46 +655,6 @@ private fun RowScope.TaskRowContent(task: DailyTask, onToggle: () -> Unit) {
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.weight(1f),
-    )
-}
-
-@Composable
-private fun TaskDragHandle(
-    onMoveUp: (() -> Unit)?,
-    onMoveDown: (() -> Unit)?,
-) {
-    var cumulativeDrag by remember { mutableStateOf(0f) }
-    var itemHeight by remember { mutableStateOf(0f) }
-
-    Icon(
-        imageVector = Icons.Rounded.DragIndicator,
-        contentDescription = "並べ替え",
-        modifier = Modifier
-            .size(20.dp)
-            .onSizeChanged { itemHeight = it.height.toFloat() }
-            .pointerInput(onMoveUp, onMoveDown) {
-                detectDragGestures(
-                    onDragStart = { cumulativeDrag = 0f },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        cumulativeDrag += dragAmount.y
-                        val threshold = if (itemHeight > 0f) itemHeight else size.height.toFloat()
-                        when {
-                            cumulativeDrag > threshold && onMoveDown != null -> {
-                                onMoveDown()
-                                cumulativeDrag = 0f
-                            }
-                            cumulativeDrag < -threshold && onMoveUp != null -> {
-                                onMoveUp()
-                                cumulativeDrag = 0f
-                            }
-                        }
-                    },
-                    onDragEnd = { cumulativeDrag = 0f },
-                    onDragCancel = { cumulativeDrag = 0f },
-                )
-            },
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
@@ -868,6 +832,7 @@ private fun ResetHourSelector(
     }
 }
 
+private val TASK_ROW_HEIGHT = 40.dp
 private const val HOURS_IN_DAY = 24
 private const val RESET_HOUR_GRID_COLUMNS = 4
 private val RESET_HOUR_GRID_HEIGHT = 240.dp
