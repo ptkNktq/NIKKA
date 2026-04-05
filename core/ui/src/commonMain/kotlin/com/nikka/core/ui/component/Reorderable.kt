@@ -87,7 +87,8 @@ fun DragHandle(
                                 if (state.dragOffset > nextHeight / 2) {
                                     currentOnMove(state.draggedIndex, state.draggedIndex + 1)
                                     state.draggedIndex++
-                                    state.dragOffset -= nextHeight
+                                    state.dragOffset = (state.dragOffset - nextHeight)
+                                        .coerceAtLeast(0f)
                                 }
                             }
                             state.dragOffset < 0 && state.draggedIndex > 0 -> {
@@ -95,7 +96,8 @@ fun DragHandle(
                                 if (state.dragOffset < -prevHeight / 2) {
                                     currentOnMove(state.draggedIndex, state.draggedIndex - 1)
                                     state.draggedIndex--
-                                    state.dragOffset += prevHeight
+                                    state.dragOffset = (state.dragOffset + prevHeight)
+                                        .coerceAtMost(0f)
                                 }
                             }
                         }
