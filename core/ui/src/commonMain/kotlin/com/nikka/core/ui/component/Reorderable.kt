@@ -140,7 +140,7 @@ class ReorderState {
 
     companion object {
         private const val SETTLE_DURATION_MS = 200
-        internal const val SCROLL_ZONE_FRACTION = 0.15f
+        internal const val SCROLL_ZONE_FRACTION = 0.25f
         internal const val SCROLL_SPEED_PX = 12f
         internal const val SCROLL_INTERVAL_MS = 16L
     }
@@ -161,11 +161,12 @@ fun rememberReorderState(lazyListState: LazyListState? = null): ReorderState {
                     val draggedItem = layoutInfo.visibleItemsInfo
                         .find { it.index == state.draggedIndex }
                     if (draggedItem != null) {
-                        val itemTop = draggedItem.offset + state.dragOffset
-                        val itemBottom = itemTop + draggedItem.size
+                        val itemCenter = draggedItem.offset + draggedItem.size / 2 + state.dragOffset
                         val scrollAmount = when {
-                            itemTop < scrollZone -> -ReorderState.SCROLL_SPEED_PX
-                            itemBottom > viewportHeight - scrollZone -> ReorderState.SCROLL_SPEED_PX
+                            itemCenter < scrollZone && lazyListState.canScrollBackward ->
+                                -ReorderState.SCROLL_SPEED_PX
+                            itemCenter > viewportHeight - scrollZone && lazyListState.canScrollForward ->
+                                ReorderState.SCROLL_SPEED_PX
                             else -> 0f
                         }
                         if (scrollAmount != 0f) {
