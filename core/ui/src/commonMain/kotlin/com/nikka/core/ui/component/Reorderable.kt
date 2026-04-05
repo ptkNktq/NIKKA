@@ -146,8 +146,9 @@ class ReorderState {
         val edgeZone = viewportHeight * EDGE_ZONE_FRACTION
         val visualCenter = draggedItem.offset + draggedItem.size / 2 + dragOffset
         val target = findEdgeSwapTarget(visualCenter, edgeZone, viewportHeight)
+        val fallbackDist = itemHeights[draggedIndex] ?: 0f
         val dist = if (target != null) {
-            getSlotDistance(draggedIndex, target) ?: itemHeights[target] ?: 0f
+            getSlotDistance(draggedIndex, target) ?: itemHeights[target] ?: fallbackDist
         } else {
             0f
         }
