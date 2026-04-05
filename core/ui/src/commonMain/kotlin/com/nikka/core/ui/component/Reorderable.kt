@@ -42,6 +42,8 @@ class ReorderState {
         internal set
     internal val itemHeights = mutableStateMapOf<Int, Float>()
     private var lastSwapDirection by mutableIntStateOf(0)
+    private var currentItemCount by mutableIntStateOf(0)
+    private var currentOnMove: ((Int, Int) -> Unit)? = null
 
     internal var isAnimating by mutableStateOf(false)
         private set
@@ -66,6 +68,7 @@ class ReorderState {
             draggedIndex = -1
             dragOffset = 0f
             lastSwapDirection = 0
+            currentOnMove = null
             isAnimating = false
         }
     }
@@ -75,11 +78,24 @@ class ReorderState {
         itemCount: Int,
         onMove: (from: Int, to: Int) -> Unit,
     ) {
+        currentItemCount = itemCount
+        currentOnMove = onMove
         dragOffset += deltaY
+        checkSwap()
+    }
+
+    internal fun adjustForScroll(scrolled: Float) {
+        dragOffset += scrolled
+        checkSwap()
+    }
+
+    private fun checkSwap() {
         val height = itemHeights[draggedIndex] ?: return
-        if (height <= 0f) return
-        resetDirectionLockIfCrossedZero()
-        trySwap(itemCount, height, onMove)
+        val onMove = currentOnMove ?: return
+        if (height > 0f) {
+            resetDirectionLockIfCrossedZero()
+            trySwap(currentItemCount, height, onMove)
+        }
     }
 
     private fun resetDirectionLockIfCrossedZero() {
@@ -153,7 +169,8 @@ fun rememberReorderState(lazyListState: LazyListState? = null): ReorderState {
                             else -> 0f
                         }
                         if (scrollAmount != 0f) {
-                            lazyListState.scrollBy(scrollAmount)
+                            val scrolled = lazyListState.scrollBy(scrollAmount)
+                            state.adjustForScroll(scrolled)
                         }
                     }
                     delay(ReorderState.SCROLL_INTERVAL_MS)
