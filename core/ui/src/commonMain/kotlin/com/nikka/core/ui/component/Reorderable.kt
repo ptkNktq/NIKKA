@@ -132,10 +132,14 @@ class ReorderState {
     }
 
     private fun getSlotDistance(fromIndex: Int, toIndex: Int): Float? {
-        val items = lazyListState?.layoutInfo?.visibleItemsInfo ?: return null
-        val fromItem = items.find { it.index == fromIndex } ?: return null
-        val toItem = items.find { it.index == toIndex } ?: return null
-        return kotlin.math.abs(toItem.offset - fromItem.offset).toFloat()
+        val items = lazyListState?.layoutInfo?.visibleItemsInfo
+        val fromItem = items?.find { it.index == fromIndex }
+        val toItem = items?.find { it.index == toIndex }
+        return if (fromItem != null && toItem != null) {
+            kotlin.math.abs(toItem.offset - fromItem.offset).toFloat()
+        } else {
+            null
+        }
     }
 
     private fun swapHeights(indexA: Int, indexB: Int) {
