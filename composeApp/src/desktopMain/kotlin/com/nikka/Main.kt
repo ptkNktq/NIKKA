@@ -7,7 +7,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import com.nikka.core.ui.component.NikkaWindowTopBar
+import com.nikka.desktop.ui.component.NikkaWindowTopBar
 
 fun main() = application {
     val windowState = rememberWindowState(

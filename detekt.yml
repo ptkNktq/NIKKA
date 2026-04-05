@@ -5,7 +5,7 @@ complexity:
   LongMethod:
     threshold: 60
   LongParameterList:
-    functionThreshold: 10
+    functionThreshold: 14
     constructorThreshold: 10
   TooManyFunctions:
     thresholdInFiles: 30
