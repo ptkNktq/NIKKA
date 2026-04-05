@@ -5,10 +5,12 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.PointerMatcher
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,7 +22,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.onClick
 import androidx.compose.foundation.shape.CircleShape
@@ -30,6 +31,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Refresh
@@ -75,21 +77,11 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.nikka.core.model.DailyTask
 import com.nikka.core.model.TaskGroup
-import com.nikka.core.ui.component.DragHandle
-import com.nikka.core.ui.component.ReorderState
-import com.nikka.core.ui.component.rememberReorderState
-import com.nikka.core.ui.component.reorderableItem
 import com.nikka.core.ui.theme.StatusGreen
 import com.nikka.core.ui.theme.StatusRed
 import org.koin.compose.viewmodel.koinViewModel
-
-private data class GroupReorderConfig(
-    val state: ReorderState,
-    val index: Int,
-    val groupCount: Int,
-    val onMoveGroup: (Int, Int) -> Unit,
-    val onMoveTask: (String, Int, Int) -> Unit,
-)
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun HomeScreen(
@@ -148,7 +140,9 @@ private fun HomeContent(
         EmptyState()
     } else {
         val lazyListState = rememberLazyListState()
-        val groupReorderState = rememberReorderState(lazyListState)
+        val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
+            onMoveGroup(from.index, to.index)
+        }
         LazyColumn(
             state = lazyListState,
             modifier = Modifier
@@ -156,28 +150,24 @@ private fun HomeContent(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            itemsIndexed(uiState.groups, key = { _, g -> g.id }) { index, group ->
-                GroupCard(
-                    // placementSpec = null: D&D の手動 translationY と競合するため配置アニメーション無効
-                    modifier = Modifier.animateItem(placementSpec = null),
-                    group = group,
-                    tasks = uiState.tasks.filter { it.groupId == group.id },
-                    isCollapsed = group.id in uiState.collapsedGroupIds,
-                    onToggleCollapse = { onToggleGroupCollapse(group.id) },
-                    onToggleTask = onToggleTask,
-                    onAddTask = { onShowAddTask(group.id) },
-                    onRemoveTask = onRemoveTask,
-                    onRemoveGroup = { onRemoveGroup(group.id) },
-                    onResetGroup = { onResetGroup(group.id) },
-                    onSetResetHour = { onSetResetHour(group.id) },
-                    reorder = GroupReorderConfig(
-                        state = groupReorderState,
-                        index = index,
-                        groupCount = uiState.groups.size,
-                        onMoveGroup = onMoveGroup,
+            items(uiState.groups, key = { it.id }) { group ->
+                ReorderableItem(reorderableLazyListState, key = group.id) {
+                    GroupCard(
+                        modifier = Modifier.animateItem(),
+                        group = group,
+                        tasks = uiState.tasks.filter { it.groupId == group.id },
+                        isCollapsed = group.id in uiState.collapsedGroupIds,
+                        onToggleCollapse = { onToggleGroupCollapse(group.id) },
+                        onToggleTask = onToggleTask,
+                        onAddTask = { onShowAddTask(group.id) },
+                        onRemoveTask = onRemoveTask,
+                        onRemoveGroup = { onRemoveGroup(group.id) },
+                        onResetGroup = { onResetGroup(group.id) },
+                        onSetResetHour = { onSetResetHour(group.id) },
                         onMoveTask = onMoveTask,
-                    ),
-                )
+                        dragHandle = { Modifier.draggableHandle() },
+                    )
+                }
             }
             item { Spacer(modifier = Modifier.height(80.dp)) }
         }
@@ -284,13 +274,13 @@ private fun GroupCard(
     onRemoveGroup: () -> Unit,
     onResetGroup: () -> Unit,
     onSetResetHour: () -> Unit,
-    reorder: GroupReorderConfig,
+    onMoveTask: (String, Int, Int) -> Unit,
+    dragHandle: @Composable () -> Modifier,
 ) {
     val allCompleted = tasks.isNotEmpty() && tasks.all { it.isCompleted }
 
     Column(
         modifier = modifier
-            .reorderableItem(reorder.state, reorder.index)
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surface)
@@ -306,10 +296,7 @@ private fun GroupCard(
             onResetGroup = onResetGroup,
             onRemoveGroup = onRemoveGroup,
             onSetResetHour = onSetResetHour,
-            reorderState = reorder.state,
-            index = reorder.index,
-            groupCount = reorder.groupCount,
-            onMoveGroup = reorder.onMoveGroup,
+            dragHandle = dragHandle,
         )
         if (!isCollapsed) {
             GroupCardBody(
@@ -317,7 +304,7 @@ private fun GroupCard(
                 tasks = tasks,
                 onToggleTask = onToggleTask,
                 onRemoveTask = onRemoveTask,
-                onMoveTask = reorder.onMoveTask,
+                onMoveTask = onMoveTask,
             )
         }
     }
@@ -334,10 +321,7 @@ private fun GroupCardHeader(
     onResetGroup: () -> Unit,
     onRemoveGroup: () -> Unit,
     onSetResetHour: () -> Unit,
-    reorderState: ReorderState,
-    index: Int,
-    groupCount: Int,
-    onMoveGroup: (Int, Int) -> Unit,
+    dragHandle: @Composable () -> Modifier,
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
     var contextMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
@@ -352,10 +336,7 @@ private fun GroupCardHeader(
             isCollapsed = isCollapsed,
             onToggleCollapse = onToggleCollapse,
             onResetGroup = onResetGroup,
-            reorderState = reorderState,
-            index = index,
-            groupCount = groupCount,
-            onMoveGroup = onMoveGroup,
+            dragHandle = dragHandle,
             onPointerPositionChanged = { lastPointerPosition = it },
             onSecondaryClick = {
                 with(density) {
@@ -396,10 +377,7 @@ private fun GroupCardHeaderContent(
     isCollapsed: Boolean,
     onToggleCollapse: () -> Unit,
     onResetGroup: () -> Unit,
-    reorderState: ReorderState,
-    index: Int,
-    groupCount: Int,
-    onMoveGroup: (Int, Int) -> Unit,
+    dragHandle: @Composable () -> Modifier,
     onPointerPositionChanged: (Offset) -> Unit,
     onSecondaryClick: () -> Unit,
 ) {
@@ -431,11 +409,11 @@ private fun GroupCardHeaderContent(
             modifier = Modifier.weight(1f),
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            DragHandle(
-                state = reorderState,
-                index = index,
-                itemCount = groupCount,
-                onMove = onMoveGroup,
+            Icon(
+                imageVector = Icons.Rounded.DragIndicator,
+                contentDescription = "並べ替え",
+                modifier = Modifier.size(20.dp).then(dragHandle()),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             IconButton(onClick = onResetGroup, modifier = Modifier.size(28.dp)) {
                 Icon(
@@ -567,17 +545,22 @@ private fun GroupCardBody(
             modifier = Modifier.padding(start = 22.dp, top = 4.dp),
         )
     } else {
-        val taskReorderState = rememberReorderState()
         Column(modifier = Modifier.padding(top = 4.dp)) {
             tasks.forEachIndexed { index, task ->
                 TaskRow(
                     task = task,
                     onToggle = { onToggleTask(task.id) },
                     onRemove = { onRemoveTask(task.id) },
-                    reorderState = taskReorderState,
-                    index = index,
-                    taskCount = tasks.size,
-                    onMove = { from, to -> onMoveTask(group.id, from, to) },
+                    onMoveUp = if (index > 0) {
+                        { onMoveTask(group.id, index, index - 1) }
+                    } else {
+                        null
+                    },
+                    onMoveDown = if (index < tasks.size - 1) {
+                        { onMoveTask(group.id, index, index + 1) }
+                    } else {
+                        null
+                    },
                 )
             }
         }
@@ -590,10 +573,8 @@ private fun TaskRow(
     task: DailyTask,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
-    reorderState: ReorderState,
-    index: Int,
-    taskCount: Int,
-    onMove: (Int, Int) -> Unit,
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?,
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
     var contextMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
@@ -601,29 +582,40 @@ private fun TaskRow(
     var anchorHeight by remember { mutableStateOf(0) }
     val density = LocalDensity.current
 
-    Box(
-        modifier = Modifier
-            .reorderableItem(reorderState, index)
-            .onSizeChanged { anchorHeight = it.height },
-    ) {
-        TaskRowContent(
-            task = task,
-            onToggle = onToggle,
-            reorderState = reorderState,
-            index = index,
-            taskCount = taskCount,
-            onMove = onMove,
-            onPointerPositionChanged = { lastPointerPosition = it },
-            onSecondaryClick = {
-                with(density) {
-                    contextMenuOffset = DpOffset(
-                        lastPointerPosition.x.toDp(),
-                        lastPointerPosition.y.toDp() - anchorHeight.toDp(),
-                    )
+    Box(modifier = Modifier.onSizeChanged { anchorHeight = it.height }) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            event.changes.firstOrNull()?.let {
+                                lastPointerPosition = it.position
+                            }
+                        }
+                    }
                 }
-                showContextMenu = true
-            },
-        )
+                .onClick(
+                    matcher = PointerMatcher.mouse(PointerButton.Secondary),
+                    onClick = {
+                        with(density) {
+                            contextMenuOffset = DpOffset(
+                                lastPointerPosition.x.toDp(),
+                                lastPointerPosition.y.toDp() - anchorHeight.toDp(),
+                            )
+                        }
+                        showContextMenu = true
+                    },
+                )
+                .clickable(onClick = onToggle)
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TaskDragHandle(onMoveUp = onMoveUp, onMoveDown = onMoveDown)
+            TaskRowContent(task = task, onToggle = onToggle)
+        }
         TaskContextMenu(
             expanded = showContextMenu,
             offset = contextMenuOffset,
@@ -636,73 +628,70 @@ private fun TaskRow(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TaskRowContent(
-    task: DailyTask,
-    onToggle: () -> Unit,
-    reorderState: ReorderState,
-    index: Int,
-    taskCount: Int,
-    onMove: (Int, Int) -> Unit,
-    onPointerPositionChanged: (Offset) -> Unit,
-    onSecondaryClick: () -> Unit,
+private fun RowScope.TaskRowContent(task: DailyTask, onToggle: () -> Unit) {
+    Checkbox(
+        checked = task.isCompleted,
+        onCheckedChange = { onToggle() },
+        colors = CheckboxDefaults.colors(
+            checkedColor = MaterialTheme.colorScheme.primary,
+            uncheckedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+        ),
+    )
+    Text(
+        text = task.title,
+        style = MaterialTheme.typography.bodyLarge.copy(
+            textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+        ),
+        color = if (task.isCompleted) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.weight(1f),
+    )
+}
+
+@Composable
+private fun TaskDragHandle(
+    onMoveUp: (() -> Unit)?,
+    onMoveDown: (() -> Unit)?,
 ) {
-    Row(
+    var cumulativeDrag by remember { mutableStateOf(0f) }
+    var itemHeight by remember { mutableStateOf(0f) }
+
+    Icon(
+        imageVector = Icons.Rounded.DragIndicator,
+        contentDescription = "並べ替え",
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        event.changes.firstOrNull()?.let {
-                            onPointerPositionChanged(it.position)
+            .size(20.dp)
+            .onSizeChanged { itemHeight = it.height.toFloat() }
+            .pointerInput(onMoveUp, onMoveDown) {
+                detectDragGestures(
+                    onDragStart = { cumulativeDrag = 0f },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        cumulativeDrag += dragAmount.y
+                        val threshold = if (itemHeight > 0f) itemHeight else size.height.toFloat()
+                        when {
+                            cumulativeDrag > threshold && onMoveDown != null -> {
+                                onMoveDown()
+                                cumulativeDrag = 0f
+                            }
+                            cumulativeDrag < -threshold && onMoveUp != null -> {
+                                onMoveUp()
+                                cumulativeDrag = 0f
+                            }
                         }
-                    }
-                }
-            }
-            .onClick(
-                matcher = PointerMatcher.mouse(PointerButton.Secondary),
-                onClick = onSecondaryClick,
-            )
-            .clickable(onClick = onToggle)
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        DragHandle(
-            state = reorderState,
-            index = index,
-            itemCount = taskCount,
-            onMove = onMove,
-        )
-        Checkbox(
-            checked = task.isCompleted,
-            onCheckedChange = { onToggle() },
-            colors = CheckboxDefaults.colors(
-                checkedColor = MaterialTheme.colorScheme.primary,
-                uncheckedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-            ),
-        )
-        Text(
-            text = task.title,
-            style = MaterialTheme.typography.bodyLarge.copy(
-                textDecoration = if (task.isCompleted) {
-                    TextDecoration.LineThrough
-                } else {
-                    TextDecoration.None
-                },
-            ),
-            color = if (task.isCompleted) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onSurface
+                    },
+                    onDragEnd = { cumulativeDrag = 0f },
+                    onDragCancel = { cumulativeDrag = 0f },
+                )
             },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-    }
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
