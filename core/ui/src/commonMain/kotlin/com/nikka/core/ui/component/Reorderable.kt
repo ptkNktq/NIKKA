@@ -81,19 +81,22 @@ fun DragHandle(
                         state.dragOffset += dragAmount.y
                         val height = state.itemHeights[state.draggedIndex] ?: return@detectDragGestures
                         if (height <= 0f) return@detectDragGestures
-                        val threshold = height / 2
                         when {
-                            state.dragOffset > threshold && state.draggedIndex < currentItemCount - 1 -> {
+                            state.dragOffset > 0 && state.draggedIndex < currentItemCount - 1 -> {
                                 val nextHeight = state.itemHeights[state.draggedIndex + 1] ?: height
-                                currentOnMove(state.draggedIndex, state.draggedIndex + 1)
-                                state.draggedIndex++
-                                state.dragOffset -= nextHeight
+                                if (state.dragOffset > nextHeight / 2) {
+                                    currentOnMove(state.draggedIndex, state.draggedIndex + 1)
+                                    state.draggedIndex++
+                                    state.dragOffset -= nextHeight
+                                }
                             }
-                            state.dragOffset < -threshold && state.draggedIndex > 0 -> {
+                            state.dragOffset < 0 && state.draggedIndex > 0 -> {
                                 val prevHeight = state.itemHeights[state.draggedIndex - 1] ?: height
-                                currentOnMove(state.draggedIndex, state.draggedIndex - 1)
-                                state.draggedIndex--
-                                state.dragOffset += prevHeight
+                                if (state.dragOffset < -prevHeight / 2) {
+                                    currentOnMove(state.draggedIndex, state.draggedIndex - 1)
+                                    state.draggedIndex--
+                                    state.dragOffset += prevHeight
+                                }
                             }
                         }
                     },
