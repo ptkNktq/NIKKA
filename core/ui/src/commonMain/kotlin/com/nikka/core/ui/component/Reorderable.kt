@@ -28,7 +28,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 class ReorderState {
@@ -51,18 +50,16 @@ class ReorderState {
         lastSwapDirection = 0
     }
 
-    internal fun endDrag(scope: CoroutineScope) {
+    internal suspend fun endDrag() {
         if (draggedIndex < 0) return
         isAnimating = true
-        scope.launch {
-            animate(dragOffset, 0f, animationSpec = tween(SETTLE_DURATION_MS)) { value, _ ->
-                dragOffset = value
-            }
-            draggedIndex = -1
-            dragOffset = 0f
-            lastSwapDirection = 0
-            isAnimating = false
+        animate(dragOffset, 0f, animationSpec = tween(SETTLE_DURATION_MS)) { value, _ ->
+            dragOffset = value
         }
+        draggedIndex = -1
+        dragOffset = 0f
+        lastSwapDirection = 0
+        isAnimating = false
     }
 
     internal fun onDrag(
@@ -165,8 +162,8 @@ fun DragHandle(
                         change.consume()
                         state.onDrag(dragAmount.y, currentItemCount, currentOnMove)
                     },
-                    onDragEnd = { state.endDrag(scope) },
-                    onDragCancel = { state.endDrag(scope) },
+                    onDragEnd = { scope.launch { state.endDrag() } },
+                    onDragCancel = { scope.launch { state.endDrag() } },
                 )
             },
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
