@@ -2,6 +2,8 @@
 
 package com.nikka.core.ui.component
 
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -14,7 +16,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -24,6 +28,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 class ReorderState {
     var draggedIndex by mutableIntStateOf(-1)
@@ -33,6 +39,9 @@ class ReorderState {
     internal val itemHeights = mutableStateMapOf<Int, Float>()
     private var lastSwapDirection by mutableIntStateOf(0)
 
+    internal var isAnimating by mutableStateOf(false)
+        private set
+
     val isDragging: Boolean get() = draggedIndex >= 0
 
     internal fun startDrag(index: Int) {
@@ -41,10 +50,18 @@ class ReorderState {
         lastSwapDirection = 0
     }
 
-    internal fun endDrag() {
-        draggedIndex = -1
-        dragOffset = 0f
-        lastSwapDirection = 0
+    internal fun endDrag(scope: CoroutineScope) {
+        if (draggedIndex < 0) return
+        isAnimating = true
+        scope.launch {
+            animate(dragOffset, 0f, animationSpec = tween(SETTLE_DURATION_MS)) { value, _ ->
+                dragOffset = value
+            }
+            draggedIndex = -1
+            dragOffset = 0f
+            lastSwapDirection = 0
+            isAnimating = false
+        }
     }
 
     internal fun onDrag(
@@ -96,6 +113,10 @@ class ReorderState {
         if (heightA != null) itemHeights[indexB] = heightA
         if (heightB != null) itemHeights[indexA] = heightB
     }
+
+    companion object {
+        private const val SETTLE_DURATION_MS = 200
+    }
 }
 
 @Composable
@@ -127,6 +148,7 @@ fun DragHandle(
     val currentIndex by rememberUpdatedState(index)
     val currentItemCount by rememberUpdatedState(itemCount)
     val currentOnMove by rememberUpdatedState(onMove)
+    val scope = rememberCoroutineScope()
 
     Icon(
         imageVector = Icons.Rounded.DragIndicator,
@@ -140,8 +162,8 @@ fun DragHandle(
                         change.consume()
                         state.onDrag(dragAmount.y, currentItemCount, currentOnMove)
                     },
-                    onDragEnd = { state.endDrag() },
-                    onDragCancel = { state.endDrag() },
+                    onDragEnd = { state.endDrag(scope) },
+                    onDragCancel = { state.endDrag(scope) },
                 )
             },
         tint = MaterialTheme.colorScheme.onSurfaceVariant,

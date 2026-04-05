@@ -155,7 +155,6 @@ private fun HomeContent(
         ) {
             itemsIndexed(uiState.groups, key = { _, g -> g.id }) { index, group ->
                 GroupCard(
-                    modifier = Modifier.animateItem(),
                     group = group,
                     tasks = uiState.tasks.filter { it.groupId == group.id },
                     isCollapsed = group.id in uiState.collapsedGroupIds,
