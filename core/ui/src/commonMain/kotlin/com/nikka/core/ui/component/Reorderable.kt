@@ -5,7 +5,6 @@ package com.nikka.core.ui.component
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
@@ -43,8 +42,8 @@ class ReorderState {
     internal val itemHeights = mutableStateMapOf<Int, Float>()
     internal var lazyListState: LazyListState? = null
     private var lastSwapDirection by mutableIntStateOf(0)
-    private var currentItemCount by mutableIntStateOf(0)
-    private var currentOnMove: ((Int, Int) -> Unit)? = null
+    internal var currentItemCount by mutableIntStateOf(0)
+    internal var currentOnMove: ((Int, Int) -> Unit)? = null
 
     internal var isAnimating by mutableStateOf(false)
         private set
@@ -87,10 +86,6 @@ class ReorderState {
         checkSwap()
     }
 
-    internal fun adjustForScroll(scrolled: Float) {
-        dragOffset += scrolled
-    }
-
     private fun resetDirectionLockOnDrag(oldOffset: Float) {
         val crossedZero = (oldOffset > 0 && dragOffset <= 0) || (oldOffset < 0 && dragOffset >= 0)
         if (crossedZero) lastSwapDirection = 0
@@ -131,7 +126,7 @@ class ReorderState {
         }
     }
 
-    private fun getSlotDistance(fromIndex: Int, toIndex: Int): Float? {
+    internal fun getSlotDistance(fromIndex: Int, toIndex: Int): Float? {
         val items = lazyListState?.layoutInfo?.visibleItemsInfo
         val fromItem = items?.find { it.index == fromIndex }
         val toItem = items?.find { it.index == toIndex }
@@ -139,6 +134,46 @@ class ReorderState {
             kotlin.math.abs(toItem.offset - fromItem.offset).toFloat()
         } else {
             null
+        }
+    }
+
+    internal fun tryEdgeSwap(listState: LazyListState) {
+        val onMove = currentOnMove
+        val draggedItem = listState.layoutInfo.visibleItemsInfo
+            .find { it.index == draggedIndex }
+        if (onMove == null || draggedItem == null || currentItemCount <= 0) return
+        val viewportHeight = listState.layoutInfo.viewportSize.height
+        val edgeZone = viewportHeight * EDGE_ZONE_FRACTION
+        val visualCenter = draggedItem.offset + draggedItem.size / 2 + dragOffset
+        val target = findEdgeSwapTarget(visualCenter, edgeZone, viewportHeight)
+        val dist = if (target != null) {
+            getSlotDistance(draggedIndex, target) ?: itemHeights[target] ?: 0f
+        } else {
+            0f
+        }
+        if (target != null && dist > 0f) {
+            executeSwap(target, dist, onMove)
+        }
+    }
+
+    private fun findEdgeSwapTarget(visualCenter: Float, edgeZone: Float, viewportHeight: Int): Int? {
+        return when {
+            visualCenter < edgeZone && draggedIndex > 0 -> draggedIndex - 1
+            visualCenter > viewportHeight - edgeZone && draggedIndex < currentItemCount - 1 ->
+                draggedIndex + 1
+            else -> null
+        }
+    }
+
+    private fun executeSwap(target: Int, dist: Float, onMove: (Int, Int) -> Unit) {
+        swapHeights(draggedIndex, target)
+        onMove(draggedIndex, target)
+        if (target < draggedIndex) {
+            draggedIndex--
+            dragOffset += dist
+        } else {
+            draggedIndex++
+            dragOffset -= dist
         }
     }
 
@@ -153,10 +188,8 @@ class ReorderState {
 
     companion object {
         private const val SETTLE_DURATION_MS = 200
-        internal const val SCROLL_ZONE_FRACTION = 0.25f
-        internal const val SCROLL_SPEED_PX = 8f
-        internal const val SCROLL_INTERVAL_MS = 16L
-        internal const val VIEWPORT_MARGIN = 40f
+        internal const val EDGE_ZONE_FRACTION = 0.2f
+        internal const val AUTO_SWAP_INTERVAL_MS = 300L
     }
 }
 
@@ -166,49 +199,23 @@ fun rememberReorderState(lazyListState: LazyListState? = null): ReorderState {
     state.lazyListState = lazyListState
 
     if (lazyListState != null) {
-        LaunchedEffect(Unit) {
-            snapshotFlow { state.isDragging }.collect { dragging ->
-                if (!dragging) return@collect
-                while (state.isDragging) {
-                    val layoutInfo = lazyListState.layoutInfo
-                    val viewportHeight = layoutInfo.viewportSize.height
-                    val scrollZone = viewportHeight * ReorderState.SCROLL_ZONE_FRACTION
-                    val draggedItem = layoutInfo.visibleItemsInfo
-                        .find { it.index == state.draggedIndex }
-                    if (draggedItem != null) {
-                        val visualCenter = draggedItem.offset + draggedItem.size / 2 + state.dragOffset
-                        val rawScroll = when {
-                            visualCenter < scrollZone && lazyListState.canScrollBackward ->
-                                -ReorderState.SCROLL_SPEED_PX
-                            visualCenter > viewportHeight - scrollZone && lazyListState.canScrollForward ->
-                                ReorderState.SCROLL_SPEED_PX
-                            else -> 0f
-                        }
-                        // レイアウト位置がビューポート内に留まるよう制限（リサイクル防止）
-                        val layoutTop = draggedItem.offset
-                        val layoutBottom = layoutTop + draggedItem.size
-                        val margin = ReorderState.VIEWPORT_MARGIN
-                        val safeScroll = when {
-                            rawScroll > 0 -> rawScroll.coerceAtMost(
-                                (layoutTop - margin).coerceAtLeast(0f),
-                            )
-                            rawScroll < 0 -> rawScroll.coerceAtLeast(
-                                -(viewportHeight - layoutBottom - margin).coerceAtLeast(0f),
-                            )
-                            else -> 0f
-                        }
-                        if (safeScroll != 0f) {
-                            val scrolled = lazyListState.scrollBy(safeScroll)
-                            state.adjustForScroll(scrolled)
-                        }
-                    }
-                    delay(ReorderState.SCROLL_INTERVAL_MS)
-                }
-            }
-        }
+        AutoSwapEffect(state, lazyListState)
     }
 
     return state
+}
+
+@Composable
+private fun AutoSwapEffect(state: ReorderState, lazyListState: LazyListState) {
+    LaunchedEffect(Unit) {
+        snapshotFlow { state.isDragging }.collect { dragging ->
+            if (!dragging) return@collect
+            while (state.isDragging && !state.isAnimating) {
+                state.tryEdgeSwap(lazyListState)
+                delay(ReorderState.AUTO_SWAP_INTERVAL_MS)
+            }
+        }
+    }
 }
 
 fun Modifier.reorderableItem(
