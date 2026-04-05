@@ -835,6 +835,7 @@ private fun ResetHourSelector(
     }
 }
 
+// タスク行の固定高さ。変更時はコンテキストメニューのオフセット計算にも影響する
 private val TASK_ROW_HEIGHT = 40.dp
 private const val HOURS_IN_DAY = 24
 private const val RESET_HOUR_GRID_COLUMNS = 4
