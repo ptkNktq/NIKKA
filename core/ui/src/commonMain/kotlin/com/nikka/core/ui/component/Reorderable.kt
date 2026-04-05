@@ -176,23 +176,24 @@ fun rememberReorderState(lazyListState: LazyListState? = null): ReorderState {
                     val draggedItem = layoutInfo.visibleItemsInfo
                         .find { it.index == state.draggedIndex }
                     if (draggedItem != null) {
-                        val itemCenter = draggedItem.offset + draggedItem.size / 2 + state.dragOffset
-                        val itemTop = draggedItem.offset + state.dragOffset
-                        val itemBottom = itemTop + draggedItem.size
+                        val visualCenter = draggedItem.offset + draggedItem.size / 2 + state.dragOffset
                         val rawScroll = when {
-                            itemCenter < scrollZone && lazyListState.canScrollBackward ->
+                            visualCenter < scrollZone && lazyListState.canScrollBackward ->
                                 -ReorderState.SCROLL_SPEED_PX
-                            itemCenter > viewportHeight - scrollZone && lazyListState.canScrollForward ->
+                            visualCenter > viewportHeight - scrollZone && lazyListState.canScrollForward ->
                                 ReorderState.SCROLL_SPEED_PX
                             else -> 0f
                         }
-                        // ドラッグ中のアイテムがビューポート外に出ないよう制限
+                        // レイアウト位置がビューポート内に留まるよう制限（リサイクル防止）
+                        val layoutTop = draggedItem.offset
+                        val layoutBottom = layoutTop + draggedItem.size
+                        val margin = ReorderState.VIEWPORT_MARGIN
                         val safeScroll = when {
                             rawScroll > 0 -> rawScroll.coerceAtMost(
-                                (itemTop - ReorderState.VIEWPORT_MARGIN).coerceAtLeast(0f),
+                                (layoutTop - margin).coerceAtLeast(0f),
                             )
                             rawScroll < 0 -> rawScroll.coerceAtLeast(
-                                -(viewportHeight - itemBottom - ReorderState.VIEWPORT_MARGIN).coerceAtLeast(0f),
+                                -(viewportHeight - layoutBottom - margin).coerceAtLeast(0f),
                             )
                             else -> 0f
                         }
