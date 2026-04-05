@@ -155,6 +155,7 @@ private fun HomeContent(
         ) {
             itemsIndexed(uiState.groups, key = { _, g -> g.id }) { index, group ->
                 GroupCard(
+                    modifier = Modifier.animateItem(),
                     group = group,
                     tasks = uiState.tasks.filter { it.groupId == group.id },
                     isCollapsed = group.id in uiState.collapsedGroupIds,
@@ -268,6 +269,7 @@ private fun EmptyState() {
 
 @Composable
 private fun GroupCard(
+    modifier: Modifier = Modifier,
     group: TaskGroup,
     tasks: List<DailyTask>,
     isCollapsed: Boolean,
@@ -283,7 +285,7 @@ private fun GroupCard(
     val allCompleted = tasks.isNotEmpty() && tasks.all { it.isCompleted }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .reorderableItem(reorder.state, reorder.index)
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
