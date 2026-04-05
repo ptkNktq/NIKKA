@@ -84,8 +84,7 @@ class ReorderState {
         checkSwap()
     }
 
-    internal fun adjustForScroll(scrolled: Float) {
-        dragOffset += scrolled
+    internal fun checkSwapAfterScroll() {
         checkSwap()
     }
 
@@ -170,8 +169,8 @@ fun rememberReorderState(lazyListState: LazyListState? = null): ReorderState {
                             else -> 0f
                         }
                         if (scrollAmount != 0f) {
-                            val scrolled = lazyListState.scrollBy(scrollAmount)
-                            state.adjustForScroll(scrolled)
+                            lazyListState.scrollBy(scrollAmount)
+                            state.checkSwapAfterScroll()
                         }
                     }
                     delay(ReorderState.SCROLL_INTERVAL_MS)
