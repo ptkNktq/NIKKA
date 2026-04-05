@@ -137,11 +137,11 @@ class ReorderState {
         }
     }
 
-    internal fun tryEdgeSwap(listState: LazyListState) {
+    internal fun tryEdgeSwap(listState: LazyListState): Boolean {
         val onMove = currentOnMove
         val draggedItem = listState.layoutInfo.visibleItemsInfo
             .find { it.index == draggedIndex }
-        if (onMove == null || draggedItem == null || currentItemCount <= 0) return
+        if (onMove == null || draggedItem == null || currentItemCount <= 0) return false
         val viewportHeight = listState.layoutInfo.viewportSize.height
         val edgeZone = viewportHeight * EDGE_ZONE_FRACTION
         val visualCenter = draggedItem.offset + draggedItem.size / 2 + dragOffset
@@ -152,8 +152,11 @@ class ReorderState {
         } else {
             0f
         }
-        if (target != null && dist > 0f) {
+        return if (target != null && dist > 0f) {
             executeSwap(target, dist, onMove)
+            true
+        } else {
+            false
         }
     }
 
@@ -212,7 +215,11 @@ private fun AutoSwapEffect(state: ReorderState, lazyListState: LazyListState) {
         snapshotFlow { state.isDragging }.collect { dragging ->
             if (!dragging) return@collect
             while (state.isDragging && !state.isAnimating) {
-                state.tryEdgeSwap(lazyListState)
+                if (state.tryEdgeSwap(lazyListState)) {
+                    lazyListState.scrollToItem(
+                        index = (state.draggedIndex - 1).coerceAtLeast(0),
+                    )
+                }
                 delay(ReorderState.AUTO_SWAP_INTERVAL_MS)
             }
         }
