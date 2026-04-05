@@ -79,6 +79,7 @@ import com.nikka.core.model.TaskGroup
 import com.nikka.core.ui.theme.StatusGreen
 import com.nikka.core.ui.theme.StatusRed
 import org.koin.compose.viewmodel.koinViewModel
+import sh.calvin.reorderable.ReorderableColumn
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -164,7 +165,7 @@ private fun HomeContent(
                         onResetGroup = { onResetGroup(group.id) },
                         onSetResetHour = { onSetResetHour(group.id) },
                         onMoveTask = onMoveTask,
-                        dragHandle = { Modifier.draggableHandle() },
+                        dragModifier = Modifier.draggableHandle(),
                     )
                 }
             }
@@ -274,7 +275,7 @@ private fun GroupCard(
     onResetGroup: () -> Unit,
     onSetResetHour: () -> Unit,
     onMoveTask: (String, Int, Int) -> Unit,
-    dragHandle: @Composable () -> Modifier,
+    dragModifier: Modifier = Modifier,
 ) {
     val allCompleted = tasks.isNotEmpty() && tasks.all { it.isCompleted }
 
@@ -295,7 +296,7 @@ private fun GroupCard(
             onResetGroup = onResetGroup,
             onRemoveGroup = onRemoveGroup,
             onSetResetHour = onSetResetHour,
-            dragHandle = dragHandle,
+            dragModifier = dragModifier,
         )
         if (!isCollapsed) {
             GroupCardBody(
@@ -320,7 +321,7 @@ private fun GroupCardHeader(
     onResetGroup: () -> Unit,
     onRemoveGroup: () -> Unit,
     onSetResetHour: () -> Unit,
-    dragHandle: @Composable () -> Modifier,
+    dragModifier: Modifier = Modifier,
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
     var contextMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
@@ -335,7 +336,7 @@ private fun GroupCardHeader(
             isCollapsed = isCollapsed,
             onToggleCollapse = onToggleCollapse,
             onResetGroup = onResetGroup,
-            dragHandle = dragHandle,
+            dragModifier = dragModifier,
             onPointerPositionChanged = { lastPointerPosition = it },
             onSecondaryClick = {
                 with(density) {
@@ -376,7 +377,7 @@ private fun GroupCardHeaderContent(
     isCollapsed: Boolean,
     onToggleCollapse: () -> Unit,
     onResetGroup: () -> Unit,
-    dragHandle: @Composable () -> Modifier,
+    dragModifier: Modifier = Modifier,
     onPointerPositionChanged: (Offset) -> Unit,
     onSecondaryClick: () -> Unit,
 ) {
@@ -411,7 +412,7 @@ private fun GroupCardHeaderContent(
             Icon(
                 imageVector = Icons.Rounded.DragIndicator,
                 contentDescription = "並べ替え",
-                modifier = Modifier.size(20.dp).then(dragHandle()),
+                modifier = Modifier.size(20.dp).then(dragModifier),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             IconButton(onClick = onResetGroup, modifier = Modifier.size(28.dp)) {
@@ -544,25 +545,20 @@ private fun GroupCardBody(
             modifier = Modifier.padding(start = 22.dp, top = 4.dp),
         )
     } else {
-        val taskLazyListState = rememberLazyListState()
-        val taskReorderableState = rememberReorderableLazyListState(taskLazyListState) { from, to ->
-            onMoveTask(group.id, from.index, to.index)
-        }
-        LazyColumn(
-            state = taskLazyListState,
-            modifier = Modifier
-                .padding(top = 4.dp)
-                .height(TASK_ROW_HEIGHT * tasks.size),
-        ) {
-            items(tasks, key = { it.id }) { task ->
-                ReorderableItem(taskReorderableState, key = task.id) {
-                    TaskRow(
-                        task = task,
-                        onToggle = { onToggleTask(task.id) },
-                        onRemove = { onRemoveTask(task.id) },
-                        dragHandle = { Modifier.draggableHandle() },
-                    )
-                }
+        ReorderableColumn(
+            list = tasks,
+            onSettle = { fromIndex, toIndex ->
+                onMoveTask(group.id, fromIndex, toIndex)
+            },
+            modifier = Modifier.padding(top = 4.dp),
+        ) { _, task, _ ->
+            ReorderableItem {
+                TaskRow(
+                    task = task,
+                    onToggle = { onToggleTask(task.id) },
+                    onRemove = { onRemoveTask(task.id) },
+                    dragModifier = Modifier.draggableHandle(),
+                )
             }
         }
     }
@@ -574,7 +570,7 @@ private fun TaskRow(
     task: DailyTask,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
-    dragHandle: @Composable () -> Modifier,
+    dragModifier: Modifier = Modifier,
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
     var contextMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
@@ -603,7 +599,7 @@ private fun TaskRow(
                         with(density) {
                             contextMenuOffset = DpOffset(
                                 lastPointerPosition.x.toDp(),
-                                lastPointerPosition.y.toDp() - TASK_ROW_HEIGHT.toPx().toDp(),
+                                lastPointerPosition.y.toDp() - TASK_ROW_HEIGHT,
                             )
                         }
                         showContextMenu = true
@@ -615,7 +611,7 @@ private fun TaskRow(
             Icon(
                 imageVector = Icons.Rounded.DragIndicator,
                 contentDescription = "並べ替え",
-                modifier = Modifier.size(20.dp).then(dragHandle()),
+                modifier = Modifier.size(20.dp).then(dragModifier),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             TaskRowContent(task = task, onToggle = onToggle)
