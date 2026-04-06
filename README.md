@@ -82,6 +82,12 @@ gradlew.bat detekt                    # Windows
 gradlew.bat detekt --auto-correct     # Windows
 ```
 
+## クレジット
+
+| 対象 | 制作者 |
+|------|--------|
+| アプリアイコン | [みかしぎ](https://x.com/mechashigi) |
+
 ## データ保存先
 
 `~/.nikka/data.json` にグループとタスクのデータを JSON で保存。
