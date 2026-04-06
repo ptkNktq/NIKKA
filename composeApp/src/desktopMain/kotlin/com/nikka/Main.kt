@@ -1,5 +1,6 @@
 package com.nikka
 
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +44,11 @@ fun main() = application {
         resizable = true,
         undecorated = true,
     ) {
+        LaunchedEffect(isVisible) {
+            if (isVisible) {
+                window.toFront()
+            }
+        }
         val scope = this
         App(
             topBar = { actions ->
