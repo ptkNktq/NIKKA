@@ -15,9 +15,17 @@ fun Provider<PluginDependency>.toDep() = map {
 
 gradlePlugin {
     plugins {
+        register("kotlinBase") {
+            id = "nikka.kotlin.base"
+            implementationClass = "NikkaKotlinBaseConventionPlugin"
+        }
         register("kotlinLibrary") {
             id = "nikka.kotlin.library"
             implementationClass = "NikkaKotlinLibraryConventionPlugin"
+        }
+        register("composeBase") {
+            id = "nikka.compose.base"
+            implementationClass = "NikkaComposeBaseConventionPlugin"
         }
         register("composeLibrary") {
             id = "nikka.compose.library"
