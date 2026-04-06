@@ -11,6 +11,8 @@
 - **ドラッグ&ドロップ**: グループ・タスクの並べ替え
 - **折りたたみ**: グループを展開/折りたたみ（全タスク完了時に自動折りたたみ）
 - **右クリックメニュー**: タスク削除、グループの日課追加・リセット時刻設定・削除
+- **設定画面**: トップバーの歯車アイコンから設定画面を表示
+- **ライセンス表示**: 使用ライブラリのライセンス情報を一覧表示（AboutLibraries）
 - **データ永続化**: JSON ファイルによるローカル保存 (`~/.nikka/data.json`)
 
 ## 技術スタック
@@ -23,26 +25,31 @@
 | DI | Koin 4.0.2 |
 | シリアライズ | kotlinx-serialization 1.7.3 |
 | フォント | Noto Sans JP |
+| ライセンス表示 | AboutLibraries 11.6.3 |
 | Lint | detekt + ktlint (detekt-formatting) |
 
 ## モジュール構成
 
 ```
-:core:model     ← データクラス (DailyTask, TaskGroup)
-:core:data      ← Repository インターフェース + JSON 実装
-:core:ui        ← テーマ、共通コンポーネント、フォントリソース
-:feature:home   ← ホーム画面 (HomeScreen, HomeViewModel)
-:composeApp     ← エントリポイント、DI 設定、ウィンドウ制御
+:core:model      ← データクラス (DailyTask, TaskGroup)
+:core:data       ← Repository インターフェース + JSON 実装
+:core:ui         ← テーマ、共通コンポーネント、フォントリソース
+:feature:home    ← ホーム画面 (HomeScreen, HomeViewModel)
+:feature:settings ← 設定画面
+:feature:license ← ライセンス一覧画面 (AboutLibraries)
+:composeApp      ← エントリポイント、DI 設定、ウィンドウ制御
 ```
 
 依存関係:
 
 ```
-:core:model     → (なし)
-:core:data      → :core:model
-:core:ui        → (なし)
-:feature:home   → :core:model, :core:data, :core:ui
-:composeApp     → 全モジュール
+:core:model      → (なし)
+:core:data       → :core:model
+:core:ui         → (なし)
+:feature:home    → :core:model, :core:data, :core:ui
+:feature:settings → :core:ui
+:feature:license → :core:ui
+:composeApp      → 全モジュール
 ```
 
 ## 開発環境
