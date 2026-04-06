@@ -22,7 +22,7 @@ DISPLAY=:0 ./gradlew composeApp:run
 ## Architecture
 
 - **MVVM + Repository**: ViewModel が StateFlow で UI 状態を管理、Repository がデータ永続化を担当
-- **Feature-based Gradle modules**: `:core:model`, `:core:data`, `:core:ui`, `:feature:home`, `:composeApp`
+- **Feature-based Gradle modules**: `:core:model`, `:core:data`, `:core:ui`, `:feature:home`, `:feature:settings`, `:feature:license`, `:composeApp`
 - **DI**: Koin (`composeApp/src/commonMain/kotlin/com/nikka/di/AppModule.kt`)
 
 ## Conventions
