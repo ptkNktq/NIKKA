@@ -12,7 +12,9 @@ kotlin {
     jvm("desktop")
 
     sourceSets {
-        val desktopMain by getting
+        val desktopMain by getting {
+            resources.srcDir("build/generated/aboutLibraries")
+        }
 
         commonMain.dependencies {
             implementation(project(":core:model"))
