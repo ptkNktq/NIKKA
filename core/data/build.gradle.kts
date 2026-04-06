@@ -1,12 +1,9 @@
 plugins {
-    alias(libs.plugins.kotlin.multiplatform)
+    id("nikka.kotlin.library")
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.detekt)
 }
 
 kotlin {
-    jvm("desktop")
-
     sourceSets {
         commonMain.dependencies {
             implementation(project(":core:model"))
@@ -19,14 +16,4 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
     }
-}
-
-detekt {
-    buildUponDefaultConfig = true
-    config.setFrom("$rootDir/detekt.yml")
-    source.setFrom("src/commonMain/kotlin")
-}
-
-dependencies {
-    detektPlugins(libs.detekt.formatting)
 }

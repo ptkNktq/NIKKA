@@ -1,6 +1,7 @@
 rootProject.name = "NIKKA"
 
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google()
         mavenCentral()
