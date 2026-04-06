@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.aboutlibraries)
     alias(libs.plugins.detekt)
 }
 
@@ -18,6 +19,8 @@ kotlin {
             implementation(project(":core:data"))
             implementation(project(":core:ui"))
             implementation(project(":feature:home"))
+            implementation(project(":feature:settings"))
+            implementation(project(":feature:license"))
 
             implementation(compose.runtime)
             implementation(compose.foundation)
