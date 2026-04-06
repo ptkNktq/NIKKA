@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.aboutlibraries)
     alias(libs.plugins.detekt)
 }
 
@@ -11,13 +12,17 @@ kotlin {
     jvm("desktop")
 
     sourceSets {
-        val desktopMain by getting
+        val desktopMain by getting {
+            resources.srcDir("build/generated/aboutLibraries")
+        }
 
         commonMain.dependencies {
             implementation(project(":core:model"))
             implementation(project(":core:data"))
             implementation(project(":core:ui"))
             implementation(project(":feature:home"))
+            implementation(project(":feature:settings"))
+            implementation(project(":feature:license"))
 
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -52,6 +57,10 @@ compose.desktop {
             }
         }
     }
+}
+
+tasks.named("desktopProcessResources") {
+    dependsOn("exportLibraryDefinitions")
 }
 
 detekt {
