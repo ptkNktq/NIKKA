@@ -46,6 +46,7 @@ fun main() = application {
     ) {
         LaunchedEffect(isVisible) {
             if (isVisible) {
+                windowState.isMinimized = false
                 window.toFront()
             }
         }
