@@ -59,6 +59,10 @@ compose.desktop {
     }
 }
 
+tasks.named("desktopProcessResources") {
+    dependsOn("exportLibraryDefinitions")
+}
+
 detekt {
     buildUponDefaultConfig = true
     config.setFrom("$rootDir/detekt.yml")
