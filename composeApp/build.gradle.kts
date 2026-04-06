@@ -1,16 +1,11 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
-    alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.compose.multiplatform)
-    alias(libs.plugins.compose.compiler)
+    id("nikka.compose.application")
     alias(libs.plugins.aboutlibraries)
-    alias(libs.plugins.detekt)
 }
 
 kotlin {
-    jvm("desktop")
-
     sourceSets {
         val desktopMain by getting {
             resources.srcDir("build/generated/aboutLibraries")
@@ -23,11 +18,6 @@ kotlin {
             implementation(project(":feature:home"))
             implementation(project(":feature:settings"))
             implementation(project(":feature:license"))
-
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
 
             implementation(libs.kotlinx.datetime)
             implementation(libs.koin.core)
@@ -64,14 +54,8 @@ tasks.named("desktopProcessResources") {
 }
 
 detekt {
-    buildUponDefaultConfig = true
-    config.setFrom("$rootDir/detekt.yml")
     source.setFrom(
         "src/commonMain/kotlin",
         "src/desktopMain/kotlin",
     )
-}
-
-dependencies {
-    detektPlugins(libs.detekt.formatting)
 }
