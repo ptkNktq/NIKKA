@@ -102,22 +102,20 @@ fun HomeScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            HomeContent(
-                uiState = uiState,
-                onToggleTask = viewModel::toggleTask,
-                onShowAddTask = viewModel::showAddTaskDialog,
-                onRemoveTask = viewModel::removeTask,
-                onRemoveGroup = viewModel::showDeleteGroupConfirm,
-                onToggleGroupCollapse = viewModel::toggleGroupCollapse,
-                onResetGroup = viewModel::resetGroupTasks,
-                onMoveGroup = viewModel::moveGroup,
-                onSettleDrag = viewModel::settleDrag,
-                onMoveTask = viewModel::moveTask,
-                onSetResetHour = viewModel::showResetHourDialog,
-            )
-        }
+    Box(modifier = Modifier.fillMaxSize()) {
+        HomeContent(
+            uiState = uiState,
+            onToggleTask = viewModel::toggleTask,
+            onShowAddTask = viewModel::showAddTaskDialog,
+            onRemoveTask = viewModel::removeTask,
+            onRemoveGroup = viewModel::showDeleteGroupConfirm,
+            onToggleGroupCollapse = viewModel::toggleGroupCollapse,
+            onResetGroup = viewModel::resetGroupTasks,
+            onMoveGroup = viewModel::moveGroup,
+            onSettleDrag = viewModel::settleDrag,
+            onMoveTask = viewModel::moveTask,
+            onSetResetHour = viewModel::showResetHourDialog,
+        )
         FloatingActionButton(
             onClick = { viewModel.showAddGroupDialog() },
             modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
