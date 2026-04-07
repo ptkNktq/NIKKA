@@ -31,6 +31,23 @@ formatting:
 naming:
   FunctionNaming:
     functionPattern: '[a-zA-Z][a-zA-Z0-9]*'
+  ClassNaming:
+    active: true
+  PackageNaming:
+    active: true
+  VariableNaming:
+    active: true
+  TopLevelPropertyNaming:
+    active: true
+    constantPattern: '[A-Z][_A-Z0-9]*'
+    propertyPattern: '[A-Za-z][_A-Za-z0-9]*'
+    privatePropertyPattern: '_?[A-Za-z][_A-Za-z0-9]*'
+  ObjectPropertyNaming:
+    active: true
+  EnumNaming:
+    active: true
+  ConstructorParameterNaming:
+    active: true
 
 style:
   MagicNumber:
@@ -39,3 +56,7 @@ style:
     active: false
   MaxLineLength:
     maxLineLength: 120
+  # Kotlin 公式コーディング規約のクラスメンバー定義順を強制する
+  # 1. プロパティ宣言・初期化ブロック → 2. セカンダリコンストラクタ → 3. メソッド → 4. companion object
+  ClassOrdering:
+    active: true
