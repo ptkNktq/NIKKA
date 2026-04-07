@@ -22,6 +22,18 @@ class NestedTypeBeforeMethodsTest {
     }
 
     @Test
+    fun `reports nested interface declared after method`() {
+        val code = """
+            class Foo {
+                fun bar() {}
+                interface Listener
+            }
+        """.trimIndent()
+        val findings = rule.lint(code)
+        assertEquals(1, findings.size)
+    }
+
+    @Test
     fun `reports nested object declared after method`() {
         val code = """
             class Foo {
