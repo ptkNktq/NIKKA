@@ -96,7 +96,7 @@ fun HomeScreen(
         IconButton(onClick = viewModel::refreshAutoReset) {
             Icon(
                 imageVector = Icons.Rounded.Sync,
-                contentDescription = "リフレッシュ",
+                contentDescription = "リセット時刻に達した日課をリセット",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

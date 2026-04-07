@@ -1,14 +1,15 @@
 package com.nikka
 
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -38,15 +39,14 @@ fun App(
 ) {
     KoinApplication(application = { modules(appModule) }) {
         NikkaTheme {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background,
-            ) {
-                var currentScreen by remember { mutableStateOf(Screen.Home) }
-                val topBarSlot = remember { TopBarSlot() }
+            val topBarSlot = remember { TopBarSlot() }
+            var currentScreen by remember { mutableStateOf(Screen.Home) }
 
-                CompositionLocalProvider(LocalTopBarSlot provides topBarSlot) {
-                    Column(modifier = Modifier.fillMaxSize()) {
+            CompositionLocalProvider(LocalTopBarSlot provides topBarSlot) {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = MaterialTheme.colorScheme.background,
+                    topBar = {
                         topBar {
                             topBarSlot.actions()
                             when (currentScreen) {
@@ -64,7 +64,13 @@ fun App(
                                 Screen.License -> BackButton(onClick = { currentScreen = Screen.Settings })
                             }
                         }
-
+                    },
+                ) { innerPadding ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                    ) {
                         when (currentScreen) {
                             Screen.Home -> HomeScreen()
 
