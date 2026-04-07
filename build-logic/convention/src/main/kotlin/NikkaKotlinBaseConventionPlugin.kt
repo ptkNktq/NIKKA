@@ -22,6 +22,7 @@ class NikkaKotlinBaseConventionPlugin : Plugin<Project> {
 
         dependencies {
             add("detektPlugins", libs.findLibrary("detekt-formatting").get())
+            add("detektPlugins", project(":detekt-rules"))
         }
     }
 }

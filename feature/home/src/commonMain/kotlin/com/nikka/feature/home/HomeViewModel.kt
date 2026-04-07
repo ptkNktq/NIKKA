@@ -47,6 +47,12 @@ class HomeViewModel(
         loadData()
     }
 
+    private data class AutoResetResult(
+        val groups: List<TaskGroup>,
+        val tasks: List<DailyTask>,
+        val resetGroupIds: Set<String>,
+    )
+
     private fun loadData() {
         viewModelScope.launch {
             refreshMutex.withLock {
@@ -93,12 +99,6 @@ class HomeViewModel(
             }
         }
     }
-
-    private data class AutoResetResult(
-        val groups: List<TaskGroup>,
-        val tasks: List<DailyTask>,
-        val resetGroupIds: Set<String>,
-    )
 
     private fun applyAutoReset(
         groups: List<TaskGroup>,
