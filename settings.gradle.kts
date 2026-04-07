@@ -17,6 +17,7 @@ dependencyResolutionManagement {
     }
 }
 
+include(":detekt-rules")
 include(":core:model")
 include(":core:data")
 include(":core:ui")
