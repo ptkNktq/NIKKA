@@ -28,10 +28,8 @@ import java.net.URI
 @Composable
 fun SettingsScreen(
     onNavigateToLicense: () -> Unit,
-    topBar: @Composable () -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        topBar()
         Column(
             modifier = Modifier
                 .fillMaxSize()

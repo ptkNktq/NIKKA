@@ -63,6 +63,26 @@ class HomeViewModel(
         }
     }
 
+    fun refreshAutoReset() {
+        val state = _uiState.value
+        if (state.isLoading) return
+        val (groups, tasks, didReset) = applyAutoReset(state.groups, state.tasks)
+        if (!didReset) return
+        // リセットで全タスク未完了になったグループは折りたたみを解除する
+        val resetGroupIds = groups.asSequence()
+            .filter { it.lastResetDate != state.groups.find { old -> old.id == it.id }?.lastResetDate }
+            .map { it.id }
+            .toSet()
+        _uiState.update {
+            it.copy(
+                groups = groups,
+                tasks = tasks,
+                collapsedGroupIds = it.collapsedGroupIds - resetGroupIds,
+            )
+        }
+        persistAll()
+    }
+
     private fun applyAutoReset(
         groups: List<TaskGroup>,
         tasks: List<DailyTask>,

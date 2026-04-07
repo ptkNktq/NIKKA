@@ -35,6 +35,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.SportsEsports
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,6 +52,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -77,6 +79,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.nikka.core.model.DailyTask
 import com.nikka.core.model.TaskGroup
+import com.nikka.core.ui.component.LocalTopBarSlot
 import com.nikka.core.ui.theme.StatusGreen
 import com.nikka.core.ui.theme.StatusRed
 import org.koin.compose.viewmodel.koinViewModel
@@ -87,13 +90,24 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = koinViewModel(),
-    topBar: @Composable (actions: @Composable () -> Unit) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val topBarSlot = LocalTopBarSlot.current
+    DisposableEffect(viewModel) {
+        topBarSlot.set {
+            IconButton(onClick = viewModel::refreshAutoReset) {
+                Icon(
+                    imageVector = Icons.Rounded.Sync,
+                    contentDescription = "リフレッシュ",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        onDispose { topBarSlot.clear() }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            topBar {}
             HomeContent(
                 uiState = uiState,
                 onToggleTask = viewModel::toggleTask,

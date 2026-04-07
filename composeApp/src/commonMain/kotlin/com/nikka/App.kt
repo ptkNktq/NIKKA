@@ -1,5 +1,6 @@
 package com.nikka
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -9,12 +10,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.useResource
+import com.nikka.core.ui.component.LocalTopBarSlot
+import com.nikka.core.ui.component.TopBarSlot
 import com.nikka.core.ui.theme.NikkaTheme
 import com.nikka.di.appModule
 import com.nikka.feature.home.HomeScreen
@@ -39,44 +43,42 @@ fun App(
                 color = MaterialTheme.colorScheme.background,
             ) {
                 var currentScreen by remember { mutableStateOf(Screen.Home) }
+                val topBarSlot = remember { TopBarSlot() }
 
-                when (currentScreen) {
-                    Screen.Home -> HomeScreen(
-                        topBar = { actions ->
-                            topBar {
-                                IconButton(onClick = { currentScreen = Screen.Settings }) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Settings,
-                                        contentDescription = "設定",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                CompositionLocalProvider(LocalTopBarSlot provides topBarSlot) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        topBar {
+                            topBarSlot.actions()
+                            when (currentScreen) {
+                                Screen.Home -> {
+                                    IconButton(onClick = { currentScreen = Screen.Settings }) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Settings,
+                                            contentDescription = "設定",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
-                                actions()
-                            }
-                        },
-                    )
 
-                    Screen.Settings -> SettingsScreen(
-                        onNavigateToLicense = { currentScreen = Screen.License },
-                        topBar = {
-                            topBar {
-                                BackButton(onClick = { currentScreen = Screen.Home })
+                                Screen.Settings -> BackButton(onClick = { currentScreen = Screen.Home })
+                                Screen.License -> BackButton(onClick = { currentScreen = Screen.Settings })
                             }
-                        },
-                    )
-
-                    Screen.License -> {
-                        val aboutLibsJson = remember {
-                            useResource("aboutlibraries.json") { it.bufferedReader().readText() }
                         }
-                        LicenseScreen(
-                            aboutLibsJson = aboutLibsJson,
-                            topBar = {
-                                topBar {
-                                    BackButton(onClick = { currentScreen = Screen.Settings })
+
+                        when (currentScreen) {
+                            Screen.Home -> HomeScreen()
+
+                            Screen.Settings -> SettingsScreen(
+                                onNavigateToLicense = { currentScreen = Screen.License },
+                            )
+
+                            Screen.License -> {
+                                val aboutLibsJson = remember {
+                                    useResource("aboutlibraries.json") { it.bufferedReader().readText() }
                                 }
-                            },
-                        )
+                                LicenseScreen(aboutLibsJson = aboutLibsJson)
+                            }
+                        }
                     }
                 }
             }
