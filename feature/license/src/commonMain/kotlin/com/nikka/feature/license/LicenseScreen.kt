@@ -16,10 +16,8 @@ import com.nikka.core.ui.theme.TextPrimary
 @Composable
 fun LicenseScreen(
     aboutLibsJson: String,
-    topBar: @Composable () -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        topBar()
         LibrariesContainer(
             aboutLibsJson = aboutLibsJson,
             modifier = Modifier

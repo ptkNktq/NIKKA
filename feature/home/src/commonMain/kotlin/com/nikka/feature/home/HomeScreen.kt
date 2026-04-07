@@ -35,6 +35,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.SportsEsports
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -77,6 +78,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.nikka.core.model.DailyTask
 import com.nikka.core.model.TaskGroup
+import com.nikka.core.ui.component.ProvideTopBarActions
 import com.nikka.core.ui.theme.StatusGreen
 import com.nikka.core.ui.theme.StatusRed
 import org.koin.compose.viewmodel.koinViewModel
@@ -87,27 +89,33 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = koinViewModel(),
-    topBar: @Composable (actions: @Composable () -> Unit) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            topBar {}
-            HomeContent(
-                uiState = uiState,
-                onToggleTask = viewModel::toggleTask,
-                onShowAddTask = viewModel::showAddTaskDialog,
-                onRemoveTask = viewModel::removeTask,
-                onRemoveGroup = viewModel::showDeleteGroupConfirm,
-                onToggleGroupCollapse = viewModel::toggleGroupCollapse,
-                onResetGroup = viewModel::resetGroupTasks,
-                onMoveGroup = viewModel::moveGroup,
-                onSettleDrag = viewModel::settleDrag,
-                onMoveTask = viewModel::moveTask,
-                onSetResetHour = viewModel::showResetHourDialog,
+    ProvideTopBarActions {
+        IconButton(onClick = viewModel::refreshAutoReset) {
+            Icon(
+                imageVector = Icons.Rounded.Sync,
+                contentDescription = "リセット時刻に達した日課をリセット",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        HomeContent(
+            uiState = uiState,
+            onToggleTask = viewModel::toggleTask,
+            onShowAddTask = viewModel::showAddTaskDialog,
+            onRemoveTask = viewModel::removeTask,
+            onRemoveGroup = viewModel::showDeleteGroupConfirm,
+            onToggleGroupCollapse = viewModel::toggleGroupCollapse,
+            onResetGroup = viewModel::resetGroupTasks,
+            onMoveGroup = viewModel::moveGroup,
+            onSettleDrag = viewModel::settleDrag,
+            onMoveTask = viewModel::moveTask,
+            onSetResetHour = viewModel::showResetHourDialog,
+        )
         FloatingActionButton(
             onClick = { viewModel.showAddGroupDialog() },
             modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),

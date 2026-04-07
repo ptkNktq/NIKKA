@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -38,35 +40,70 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    // 手動リフレッシュの二重起動を防ぐ
+    private val refreshMutex = Mutex()
+
     init {
         loadData()
     }
 
     private fun loadData() {
         viewModelScope.launch {
-            val rawGroups = repository.loadGroups()
-            val rawTasks = repository.loadTasks()
-            val (groups, tasks, didReset) = applyAutoReset(rawGroups, rawTasks)
-            val completedGroupIds = groups.map { it.id }.filter { groupId ->
-                val groupTasks = tasks.filter { it.groupId == groupId }
-                groupTasks.isNotEmpty() && groupTasks.all { it.isCompleted }
-            }.toSet()
-            _uiState.update {
-                it.copy(
-                    groups = groups,
-                    tasks = tasks,
-                    collapsedGroupIds = completedGroupIds,
-                    isLoading = false,
-                )
+            refreshMutex.withLock {
+                loadDataLocked()
             }
-            if (didReset) persistAll()
         }
     }
+
+    private suspend fun loadDataLocked() {
+        val rawGroups = repository.loadGroups()
+        val rawTasks = repository.loadTasks()
+        val result = applyAutoReset(rawGroups, rawTasks)
+        val completedGroupIds = result.groups.map { it.id }.filter { groupId ->
+            val groupTasks = result.tasks.filter { it.groupId == groupId }
+            groupTasks.isNotEmpty() && groupTasks.all { it.isCompleted }
+        }.toSet()
+        _uiState.update {
+            it.copy(
+                groups = result.groups,
+                tasks = result.tasks,
+                collapsedGroupIds = completedGroupIds,
+                isLoading = false,
+            )
+        }
+        if (result.resetGroupIds.isNotEmpty()) persistAll()
+    }
+
+    fun refreshAutoReset() {
+        viewModelScope.launch {
+            refreshMutex.withLock {
+                val state = _uiState.value
+                if (state.isLoading) return@withLock
+                val result = applyAutoReset(state.groups, state.tasks)
+                if (result.resetGroupIds.isEmpty()) return@withLock
+                _uiState.update {
+                    it.copy(
+                        groups = result.groups,
+                        tasks = result.tasks,
+                        // リセットで全タスク未完了になったグループは折りたたみを解除する
+                        collapsedGroupIds = it.collapsedGroupIds - result.resetGroupIds,
+                    )
+                }
+                persistAll()
+            }
+        }
+    }
+
+    private data class AutoResetResult(
+        val groups: List<TaskGroup>,
+        val tasks: List<DailyTask>,
+        val resetGroupIds: Set<String>,
+    )
 
     private fun applyAutoReset(
         groups: List<TaskGroup>,
         tasks: List<DailyTask>,
-    ): Triple<List<TaskGroup>, List<DailyTask>, Boolean> {
+    ): AutoResetResult {
         val now = clock.now().toLocalDateTime(timeZone)
         val today = now.date
         val currentHour = now.hour
@@ -74,14 +111,14 @@ class HomeViewModel(
             val hour = group.resetHour ?: return@filter false
             currentHour >= hour && group.lastResetDate != today
         }.map { it.id }.toSet()
-        if (resetGroupIds.isEmpty()) return Triple(groups, tasks, false)
+        if (resetGroupIds.isEmpty()) return AutoResetResult(groups, tasks, emptySet())
         val newGroups = groups.map { group ->
             if (group.id in resetGroupIds) group.copy(lastResetDate = today) else group
         }
         val newTasks = tasks.map { task ->
             if (task.groupId in resetGroupIds) task.copy(isCompleted = false) else task
         }
-        return Triple(newGroups, newTasks, true)
+        return AutoResetResult(newGroups, newTasks, resetGroupIds)
     }
 
     fun addGroup(name: String) {
