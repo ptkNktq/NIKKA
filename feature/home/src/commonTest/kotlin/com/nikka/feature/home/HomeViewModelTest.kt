@@ -413,6 +413,74 @@ class HomeViewModelTest {
         assertTrue(vm.uiState.value.tasks.first().isCompleted)
     }
 
+    // --- Manual refresh tests ---
+
+    @Test
+    fun `manual refresh resets group when condition is met`() = runTest {
+        // 起動時は resetHour 前 → リセットされない。その後時刻が進んだ想定で手動リフレッシュ
+        val mutableClock = object : Clock {
+            var instant: Instant = Instant.parse("2026-04-05T02:00:00Z")
+            override fun now(): Instant = instant
+        }
+        repository.saveAll(
+            groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
+            tasks = listOf(DailyTask(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
+        )
+        val vm = HomeViewModel(repository, mutableClock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+        // 起動時は条件未達なのでリセットされない
+        assertTrue(vm.uiState.value.tasks.first().isCompleted)
+
+        // 時刻を進めて手動リフレッシュ
+        mutableClock.instant = Instant.parse("2026-04-05T10:00:00Z")
+        vm.refreshAutoReset()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.tasks.first().isCompleted)
+    }
+
+    @Test
+    fun `manual refresh is no-op when condition is not met`() = runTest {
+        val clock = fixedClock("2026-04-05T02:00:00Z")
+        repository.saveAll(
+            groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
+            tasks = listOf(DailyTask(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
+        )
+        val vm = HomeViewModel(repository, clock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.refreshAutoReset()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // 条件未達なのでタスクの状態は変わらない
+        assertTrue(vm.uiState.value.tasks.first().isCompleted)
+    }
+
+    @Test
+    fun `manual refresh clears collapsed state of reset groups`() = runTest {
+        // 起動時は resetHour 前 → リセットされず、全タスク完了で自動折りたたみされる
+        val mutableClock = object : Clock {
+            var instant: Instant = Instant.parse("2026-04-05T02:00:00Z")
+            override fun now(): Instant = instant
+        }
+        repository.saveAll(
+            groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
+            tasks = listOf(DailyTask(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
+        )
+        val vm = HomeViewModel(repository, mutableClock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+        // 全タスク完了により折りたたみ状態
+        assertTrue("g1" in vm.uiState.value.collapsedGroupIds)
+
+        // 時刻を進めて手動リフレッシュ → リセットされ、折りたたみも解除
+        mutableClock.instant = Instant.parse("2026-04-05T10:00:00Z")
+        vm.refreshAutoReset()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse("g1" in vm.uiState.value.collapsedGroupIds)
+        assertFalse(vm.uiState.value.tasks.first().isCompleted)
+    }
+
     private fun fixedClock(isoInstant: String): Clock = object : Clock {
         override fun now(): Instant = Instant.parse(isoInstant)
     }

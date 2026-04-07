@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -38,6 +40,9 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    // 手動リフレッシュの二重起動を防ぐ
+    private val refreshMutex = Mutex()
+
     init {
         loadData()
     }
@@ -65,19 +70,21 @@ class HomeViewModel(
 
     fun refreshAutoReset() {
         viewModelScope.launch {
-            val state = _uiState.value
-            if (state.isLoading) return@launch
-            val result = applyAutoReset(state.groups, state.tasks)
-            if (result.resetGroupIds.isEmpty()) return@launch
-            _uiState.update {
-                it.copy(
-                    groups = result.groups,
-                    tasks = result.tasks,
-                    // リセットで全タスク未完了になったグループは折りたたみを解除する
-                    collapsedGroupIds = it.collapsedGroupIds - result.resetGroupIds,
-                )
+            refreshMutex.withLock {
+                val state = _uiState.value
+                if (state.isLoading) return@withLock
+                val result = applyAutoReset(state.groups, state.tasks)
+                if (result.resetGroupIds.isEmpty()) return@withLock
+                _uiState.update {
+                    it.copy(
+                        groups = result.groups,
+                        tasks = result.tasks,
+                        // リセットで全タスク未完了になったグループは折りたたみを解除する
+                        collapsedGroupIds = it.collapsedGroupIds - result.resetGroupIds,
+                    )
+                }
+                persistAll()
             }
-            persistAll()
         }
     }
 

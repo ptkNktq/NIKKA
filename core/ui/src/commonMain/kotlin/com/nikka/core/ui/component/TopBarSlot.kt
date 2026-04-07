@@ -1,9 +1,11 @@
 package com.nikka.core.ui.component
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 
@@ -11,13 +13,15 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * 各画面が TopBar に差し込む画面固有アクションのスロット。
  * App ルートで生成し、CompositionLocal 経由で各画面が利用する。
  *
+ * **単一所有者前提**：このスロットは「現在表示中の単一画面が固有アクションを差し込む」用途に
+ * 限定される。複数画面が同時に `set` するシナリオ（ネスト Composable から同時登録など）には
+ * 対応していない。後勝ちで上書きされ、他者の登録は失われる。
+ *
  * 所有権はトークン方式で管理する。`set` が返したトークンを `clear` に渡すことで、
  * 「自分が登録したアクションだけを解除する」を保証する。
  *
- * これにより、画面遷移時に Compose の DisposableEffect が
- *   1. 新画面で `set`（新しいアクションを登録）
- *   2. 旧画面の `onDispose` で `clear`（旧画面が登録した分のみ解除）
- * の順序で実行されても、新画面のアクションが誤って消されない。
+ * 通常は直接 `set/clear` を呼ばず、[ProvideTopBarActions] を経由すること。
+ * リコンポーズ時のスタールクロージャを `rememberUpdatedState` で吸収する。
  */
 @Stable
 class TopBarSlot {
@@ -51,4 +55,21 @@ class TopBarSlot {
 
 val LocalTopBarSlot = staticCompositionLocalOf<TopBarSlot> {
     error("TopBarSlot not provided. Wrap your composables with CompositionLocalProvider(LocalTopBarSlot provides ...)")
+}
+
+/**
+ * 画面が TopBar に固有アクションを差し込むためのヘルパー。
+ *
+ * `rememberUpdatedState` で最新のラムダを参照するため、リコンポーズで `actions` の中身が
+ * 変わってもスロット側は同じラムダ参照を保持したまま、内部で常に最新版を呼び出せる。
+ * 画面の Composable が破棄されると自動的にスロットがクリアされる。
+ */
+@Composable
+fun ProvideTopBarActions(actions: @Composable () -> Unit) {
+    val slot = LocalTopBarSlot.current
+    val currentActions by rememberUpdatedState(actions)
+    DisposableEffect(slot) {
+        val token = slot.set { currentActions() }
+        onDispose { slot.clear(token) }
+    }
 }
