@@ -94,7 +94,7 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val topBarSlot = LocalTopBarSlot.current
     DisposableEffect(viewModel) {
-        topBarSlot.set {
+        val token = topBarSlot.set {
             IconButton(onClick = viewModel::refreshAutoReset) {
                 Icon(
                     imageVector = Icons.Rounded.Sync,
@@ -103,7 +103,7 @@ fun HomeScreen(
                 )
             }
         }
-        onDispose { topBarSlot.clear() }
+        onDispose { topBarSlot.clear(token) }
     }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
