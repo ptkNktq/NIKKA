@@ -22,6 +22,21 @@ import androidx.compose.runtime.staticCompositionLocalOf
  *
  * 通常は直接 `set/clear` を呼ばず、[ProvideTopBarActions] を経由すること。
  * リコンポーズ時のスタールクロージャを `rememberUpdatedState` で吸収する。
+ *
+ * ### 設計トレードオフ
+ * `actions` を `mutableStateOf<@Composable () -> Unit>` で保持しているのは Compose の
+ * 「親が子に content を渡す」標準スロット API とは逆向きの実装で、本来は推奨されない形である。
+ * しかし NIKKA の TopBar は undecorated window の `WindowDraggableArea` で包む必要があり、
+ * かつ各画面が自身の TopBar を所有するのは重複が大きいため、CompositionLocal による
+ * 「子から親へのスロット登録」という変則パターンを意図的に採用している。
+ *
+ * この設計には以下のトレードオフがある:
+ * - 初回コンポーズで親 (`topBar { slot.actions() }`) が先に走るため、子の登録は次のフレームで反映される
+ *   （実用上は 1 フレームのため知覚しにくい）
+ * - `@Composable` ラムダを `MutableState` に格納するため、`@Stable` 推論によるスキップ最適化は効きにくい
+ *
+ * 画面が増えて TopBar まわりの要件が複雑化したら、各画面が自前の Scaffold + TopAppBar を持つ
+ * 標準パターンへの移行を検討すること。
  */
 @Stable
 class TopBarSlot {
@@ -33,8 +48,10 @@ class TopBarSlot {
     /**
      * アクションを登録し、所有権トークンを返す。
      * 解除時はこのトークンを `clear` に渡すこと。
+     *
+     * 通常は [ProvideTopBarActions] 経由で使用すること。
      */
-    fun set(actions: @Composable () -> Unit): Any {
+    internal fun set(actions: @Composable () -> Unit): Any {
         val token = Any()
         this.actions = actions
         this.ownerToken = token
@@ -45,7 +62,7 @@ class TopBarSlot {
      * トークンが現所有者と一致する場合のみアクションを解除する。
      * 既に他の画面が `set` した後の場合は何もしない。
      */
-    fun clear(token: Any) {
+    internal fun clear(token: Any) {
         if (this.ownerToken === token) {
             this.actions = {}
             this.ownerToken = null

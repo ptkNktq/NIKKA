@@ -49,23 +49,29 @@ class HomeViewModel(
 
     private fun loadData() {
         viewModelScope.launch {
-            val rawGroups = repository.loadGroups()
-            val rawTasks = repository.loadTasks()
-            val result = applyAutoReset(rawGroups, rawTasks)
-            val completedGroupIds = result.groups.map { it.id }.filter { groupId ->
-                val groupTasks = result.tasks.filter { it.groupId == groupId }
-                groupTasks.isNotEmpty() && groupTasks.all { it.isCompleted }
-            }.toSet()
-            _uiState.update {
-                it.copy(
-                    groups = result.groups,
-                    tasks = result.tasks,
-                    collapsedGroupIds = completedGroupIds,
-                    isLoading = false,
-                )
+            refreshMutex.withLock {
+                loadDataLocked()
             }
-            if (result.resetGroupIds.isNotEmpty()) persistAll()
         }
+    }
+
+    private suspend fun loadDataLocked() {
+        val rawGroups = repository.loadGroups()
+        val rawTasks = repository.loadTasks()
+        val result = applyAutoReset(rawGroups, rawTasks)
+        val completedGroupIds = result.groups.map { it.id }.filter { groupId ->
+            val groupTasks = result.tasks.filter { it.groupId == groupId }
+            groupTasks.isNotEmpty() && groupTasks.all { it.isCompleted }
+        }.toSet()
+        _uiState.update {
+            it.copy(
+                groups = result.groups,
+                tasks = result.tasks,
+                collapsedGroupIds = completedGroupIds,
+                isLoading = false,
+            )
+        }
+        if (result.resetGroupIds.isNotEmpty()) persistAll()
     }
 
     fun refreshAutoReset() {
