@@ -6,6 +6,8 @@ import com.nikka.core.data.DiscordWebhookClient
 import com.nikka.core.data.NotificationScheduler
 import com.nikka.core.data.TaskRepository
 import com.nikka.core.model.NotificationSettings
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,11 +34,17 @@ class NotificationSettingsViewModel(
     )
     val uiState: StateFlow<NotificationSettingsUiState> = _uiState.asStateFlow()
 
+    private var pendingSaveJob: Job? = null
+
+    // 直近で永続化した値。debounce 保存時に scheduler 再起動要否を判定するために保持
+    private var lastPersisted: NotificationSettings = repository.notificationSettings.value
+
     init {
         // Repository の Flow を購読して、外部からの変更にも追随する
         viewModelScope.launch {
             repository.notificationSettings.collect { settings ->
                 _uiState.update { it.copy(settings = settings) }
+                lastPersisted = settings
             }
         }
     }
@@ -64,7 +72,7 @@ class NotificationSettingsViewModel(
             _uiState.update {
                 it.copy(
                     testSendStatus = TestSendStatus.Failure,
-                    testSendError = "Webhook URL が未入力ですわ",
+                    testSendError = "Webhook URL が未入力です",
                 )
             }
             return
@@ -91,9 +99,23 @@ class NotificationSettingsViewModel(
     private fun updateAndPersist(block: (NotificationSettings) -> NotificationSettings) {
         val next = block(_uiState.value.settings)
         _uiState.update { it.copy(settings = next) }
-        viewModelScope.launch {
+        pendingSaveJob?.cancel()
+        pendingSaveJob = viewModelScope.launch {
+            delay(SAVE_DEBOUNCE_MS)
+            val prev = lastPersisted
             repository.saveNotificationSettings(next)
-            scheduler.onSettingsChanged()
+            lastPersisted = next
+            if (shouldReschedule(prev, next)) scheduler.onSettingsChanged()
         }
+    }
+
+    /** scheduler の再計算が必要なフィールドのみを監視対象とする。 */
+    private fun shouldReschedule(prev: NotificationSettings, next: NotificationSettings): Boolean =
+        prev.enabled != next.enabled ||
+            prev.hour != next.hour ||
+            prev.webhookUrl.isBlank() != next.webhookUrl.isBlank()
+
+    companion object {
+        private const val SAVE_DEBOUNCE_MS = 300L
     }
 }

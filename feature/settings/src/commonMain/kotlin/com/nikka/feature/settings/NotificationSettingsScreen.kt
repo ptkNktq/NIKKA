@@ -45,6 +45,9 @@ import androidx.compose.ui.unit.dp
 import com.nikka.core.model.NotificationSettings
 import org.koin.compose.viewmodel.koinViewModel
 
+private const val HOURS_IN_DAY = 24
+private const val HOUR_GRID_COLUMNS = 4
+
 @Composable
 fun NotificationSettingsScreen(
     viewModel: NotificationSettingsViewModel = koinViewModel(),
@@ -160,7 +163,7 @@ private fun TestSendStatusText(status: TestSendStatus, errorMessage: String?) {
     val (text, color) = when (status) {
         TestSendStatus.Idle -> return
         TestSendStatus.Sending -> "送信中..." to MaterialTheme.colorScheme.onSurfaceVariant
-        TestSendStatus.Success -> "送信しましたわ" to MaterialTheme.colorScheme.primary
+        TestSendStatus.Success -> "送信しました" to MaterialTheme.colorScheme.primary
         TestSendStatus.Failure -> {
             val msg = errorMessage ?: "送信に失敗しました"
             "失敗: $msg" to MaterialTheme.colorScheme.error
@@ -341,6 +344,3 @@ private fun HourCell(
         )
     }
 }
-
-private const val HOURS_IN_DAY = 24
-private const val HOUR_GRID_COLUMNS = 4
