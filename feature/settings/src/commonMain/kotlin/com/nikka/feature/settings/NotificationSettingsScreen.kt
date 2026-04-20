@@ -114,7 +114,7 @@ private fun NotificationFields(
         onValueChange = onMessageChange,
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         label = { Text("メッセージ") },
-        minLines = MESSAGE_MIN_LINES,
+        maxLines = 4,
         enabled = settings.enabled,
     )
     NotificationHourRow(
@@ -143,7 +143,7 @@ private fun TestSendRow(
         ) {
             if (status == TestSendStatus.Sending) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(TEST_SEND_SPINNER_SIZE),
+                    modifier = Modifier.size(16.dp),
                     strokeWidth = 2.dp,
                 )
             } else {
@@ -212,7 +212,7 @@ private fun NotificationHourRow(
     val titleColor = if (enabled) {
         MaterialTheme.colorScheme.onSurface
     } else {
-        MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_ALPHA)
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
     }
     Row(
         modifier = Modifier
@@ -300,7 +300,7 @@ private fun HourGrid(
             columns = GridCells.Fixed(HOUR_GRID_COLUMNS),
             verticalArrangement = Arrangement.spacedBy(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.height(HOUR_GRID_HEIGHT),
+            modifier = Modifier.height(240.dp),
         ) {
             items(HOURS_IN_DAY) { hour ->
                 HourCell(
@@ -343,7 +343,3 @@ private fun HourCell(
 
 private const val HOURS_IN_DAY = 24
 private const val HOUR_GRID_COLUMNS = 4
-private val HOUR_GRID_HEIGHT = 240.dp
-private const val MESSAGE_MIN_LINES = 2
-private const val DISABLED_ALPHA = 0.38f
-private val TEST_SEND_SPINNER_SIZE = 16.dp
