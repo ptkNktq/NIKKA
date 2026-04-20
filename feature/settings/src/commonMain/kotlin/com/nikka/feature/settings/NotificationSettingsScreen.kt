@@ -24,8 +24,10 @@ import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -61,9 +63,12 @@ fun NotificationSettingsScreen(
         )
         NotificationFields(
             settings = state.settings,
+            testSendStatus = state.testSendStatus,
+            testSendError = state.testSendError,
             onWebhookUrlChange = viewModel::setWebhookUrl,
             onMessageChange = viewModel::setMessage,
             onHourClick = viewModel::showHourDialog,
+            onTestSendClick = viewModel::sendTestMessage,
         )
     }
 
@@ -82,9 +87,12 @@ fun NotificationSettingsScreen(
 @Composable
 private fun NotificationFields(
     settings: NotificationSettings,
+    testSendStatus: TestSendStatus,
+    testSendError: String?,
     onWebhookUrlChange: (String) -> Unit,
     onMessageChange: (String) -> Unit,
     onHourClick: () -> Unit,
+    onTestSendClick: () -> Unit,
 ) {
     OutlinedTextField(
         value = settings.webhookUrl,
@@ -94,6 +102,12 @@ private fun NotificationFields(
         placeholder = { Text("https://discord.com/api/webhooks/...") },
         singleLine = true,
         enabled = settings.enabled,
+    )
+    TestSendRow(
+        urlPresent = settings.webhookUrl.isNotBlank(),
+        status = testSendStatus,
+        errorMessage = testSendError,
+        onClick = onTestSendClick,
     )
     OutlinedTextField(
         value = settings.message,
@@ -107,6 +121,54 @@ private fun NotificationFields(
         hour = settings.hour,
         enabled = settings.enabled,
         onClick = onHourClick,
+    )
+}
+
+@Composable
+private fun TestSendRow(
+    urlPresent: Boolean,
+    status: TestSendStatus,
+    errorMessage: String?,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        OutlinedButton(
+            onClick = onClick,
+            enabled = urlPresent && status != TestSendStatus.Sending,
+            shape = RoundedCornerShape(12.dp),
+        ) {
+            if (status == TestSendStatus.Sending) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(TEST_SEND_SPINNER_SIZE),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text("テスト送信")
+            }
+        }
+        TestSendStatusText(status = status, errorMessage = errorMessage)
+    }
+}
+
+@Composable
+private fun TestSendStatusText(status: TestSendStatus, errorMessage: String?) {
+    val (text, color) = when (status) {
+        TestSendStatus.Idle -> return
+        TestSendStatus.Sending -> "送信中..." to MaterialTheme.colorScheme.onSurfaceVariant
+        TestSendStatus.Success -> "送信しましたわ" to MaterialTheme.colorScheme.primary
+        TestSendStatus.Failure -> {
+            val msg = errorMessage ?: "送信に失敗しました"
+            "失敗: $msg" to MaterialTheme.colorScheme.error
+        }
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = color,
     )
 }
 
@@ -284,3 +346,4 @@ private const val HOUR_GRID_COLUMNS = 4
 private val HOUR_GRID_HEIGHT = 240.dp
 private const val MESSAGE_MIN_LINES = 2
 private const val DISABLED_ALPHA = 0.38f
+private val TEST_SEND_SPINNER_SIZE = 16.dp

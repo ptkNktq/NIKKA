@@ -17,5 +17,5 @@ val appModule = module {
     single { NotificationScheduler(get(), get(), get()) }
     viewModel { HomeViewModel(get(), get()) }
     // SettingsScreen / NotificationSettingsScreen の両方で同一インスタンスを共有するため single
-    single { SettingsViewModel(get(), get()) }
+    single { SettingsViewModel(get(), get(), get()) }
 }

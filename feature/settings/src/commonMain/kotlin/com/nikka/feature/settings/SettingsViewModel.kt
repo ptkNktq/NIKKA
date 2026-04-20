@@ -2,6 +2,7 @@ package com.nikka.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nikka.core.data.DiscordWebhookClient
 import com.nikka.core.data.NotificationScheduler
 import com.nikka.core.data.TaskRepository
 import com.nikka.core.model.NotificationSettings
@@ -11,15 +12,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+enum class TestSendStatus { Idle, Sending, Success, Failure }
+
 data class SettingsUiState(
     val settings: NotificationSettings = NotificationSettings(),
     val isLoading: Boolean = true,
     val isHourDialogVisible: Boolean = false,
+    val testSendStatus: TestSendStatus = TestSendStatus.Idle,
+    val testSendError: String? = null,
 )
 
 class SettingsViewModel(
     private val repository: TaskRepository,
     private val scheduler: NotificationScheduler,
+    private val webhookClient: DiscordWebhookClient,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -46,6 +52,36 @@ class SettingsViewModel(
 
     fun dismissHourDialog() {
         _uiState.update { it.copy(isHourDialogVisible = false) }
+    }
+
+    fun sendTestMessage() {
+        val current = _uiState.value.settings
+        if (current.webhookUrl.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    testSendStatus = TestSendStatus.Failure,
+                    testSendError = "Webhook URL が未入力ですわ",
+                )
+            }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(testSendStatus = TestSendStatus.Sending, testSendError = null)
+            }
+            val content = "[NIKKA テスト通知]\n${current.message}"
+            val result = webhookClient.send(current.webhookUrl, content)
+            _uiState.update {
+                if (result.isSuccess) {
+                    it.copy(testSendStatus = TestSendStatus.Success, testSendError = null)
+                } else {
+                    it.copy(
+                        testSendStatus = TestSendStatus.Failure,
+                        testSendError = result.exceptionOrNull()?.message ?: "送信に失敗しました",
+                    )
+                }
+            }
+        }
     }
 
     private fun updateAndPersist(block: (NotificationSettings) -> NotificationSettings) {
