@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 data class NotificationSettings(
     val enabled: Boolean = false,
     val webhookUrl: String = "",
-    val message: String = DEFAULT_MESSAGE,
+    val message: String? = null,
     val hour: Int = DEFAULT_HOUR,
 ) {
     init {

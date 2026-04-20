@@ -110,10 +110,11 @@ private fun NotificationFields(
         onClick = onTestSendClick,
     )
     OutlinedTextField(
-        value = settings.message,
+        value = settings.message.orEmpty(),
         onValueChange = onMessageChange,
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         label = { Text("メッセージ") },
+        placeholder = { Text("未入力時はデフォルト文言で送信") },
         maxLines = 4,
         enabled = settings.enabled,
     )

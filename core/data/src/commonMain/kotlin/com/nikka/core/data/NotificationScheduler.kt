@@ -1,5 +1,6 @@
 package com.nikka.core.data
 
+import com.nikka.core.model.NotificationSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -65,7 +66,10 @@ class NotificationScheduler(
             val waitMs = computeWaitMillis(settings.hour)
             if (waitMs > 0) delay(waitMs)
             try {
-                fireIfNeeded(settings.webhookUrl, settings.message)
+                fireIfNeeded(
+                    webhookUrl = settings.webhookUrl,
+                    message = settings.message ?: NotificationSettings.DEFAULT_MESSAGE,
+                )
             } catch (_: Exception) {
                 // 通知の失敗はログ抑制。次サイクルで再試行される。
             }
