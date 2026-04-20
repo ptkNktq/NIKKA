@@ -1,6 +1,7 @@
 package com.nikka.core.data
 
 import com.nikka.core.model.DailyTask
+import com.nikka.core.model.NotificationSettings
 import com.nikka.core.model.TaskGroup
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -21,7 +22,10 @@ class JsonTaskRepository(
     private val filePath: Path = defaultFilePath(),
 ) : TaskRepository {
 
-    private val json = Json { prettyPrint = true }
+    private val json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+    }
     private val mutex = Mutex()
 
     override suspend fun loadGroups(): List<TaskGroup> = load().groups
@@ -30,7 +34,27 @@ class JsonTaskRepository(
 
     override suspend fun saveAll(groups: List<TaskGroup>, tasks: List<DailyTask>) {
         mutex.withLock {
-            writeFile(NikkaData(groups = groups, tasks = tasks))
+            val current = readFile()
+            writeFile(current.copy(groups = groups, tasks = tasks))
+        }
+    }
+
+    override suspend fun loadNotificationSettings(): NotificationSettings =
+        load().notificationSettings
+
+    override suspend fun saveNotificationSettings(settings: NotificationSettings) {
+        mutex.withLock {
+            val current = readFile()
+            writeFile(current.copy(notificationSettings = settings))
+        }
+    }
+
+    override suspend fun loadLastNotifiedDate(): LocalDate? = load().lastNotifiedDate
+
+    override suspend fun saveLastNotifiedDate(date: LocalDate) {
+        mutex.withLock {
+            val current = readFile()
+            writeFile(current.copy(lastNotifiedDate = date))
         }
     }
 
