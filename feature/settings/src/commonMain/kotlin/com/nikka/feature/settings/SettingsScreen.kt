@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.nikka.core.data.TaskRepository
 import com.nikka.core.model.NotificationSettings
 import org.koin.compose.koinInject
 import java.awt.Desktop
@@ -36,9 +37,9 @@ import java.net.URI
 fun SettingsScreen(
     onNavigateToNotification: () -> Unit,
     onNavigateToLicense: () -> Unit,
-    viewModel: SettingsViewModel = koinInject(),
+    repository: TaskRepository = koinInject(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val notificationSettings by repository.notificationSettings.collectAsState()
 
     Column(
         modifier = Modifier
@@ -50,7 +51,7 @@ fun SettingsScreen(
         SettingsItem(
             icon = Icons.Rounded.Notifications,
             title = "未達成通知",
-            subtitle = notificationSubtitle(state.settings),
+            subtitle = notificationSubtitle(notificationSettings),
             trailingIcon = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
             onClick = onNavigateToNotification,
         )

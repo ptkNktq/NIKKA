@@ -60,7 +60,7 @@ class NotificationScheduler(
     @Suppress("TooGenericExceptionCaught")
     private suspend fun runLoop() {
         while (scope.isActive) {
-            val settings = repository.loadNotificationSettings()
+            val settings = repository.notificationSettings.value
             if (!settings.enabled || settings.webhookUrl.isBlank()) return
             val waitMs = computeWaitMillis(settings.hour)
             if (waitMs > 0) delay(waitMs)

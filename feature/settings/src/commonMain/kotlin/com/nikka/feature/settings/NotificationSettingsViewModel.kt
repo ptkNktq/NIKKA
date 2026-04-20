@@ -14,27 +14,30 @@ import kotlinx.coroutines.launch
 
 enum class TestSendStatus { Idle, Sending, Success, Failure }
 
-data class SettingsUiState(
+data class NotificationSettingsUiState(
     val settings: NotificationSettings = NotificationSettings(),
-    val isLoading: Boolean = true,
     val isHourDialogVisible: Boolean = false,
     val testSendStatus: TestSendStatus = TestSendStatus.Idle,
     val testSendError: String? = null,
 )
 
-class SettingsViewModel(
+class NotificationSettingsViewModel(
     private val repository: TaskRepository,
     private val scheduler: NotificationScheduler,
     private val webhookClient: DiscordWebhookClient,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SettingsUiState())
-    val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(
+        NotificationSettingsUiState(settings = repository.notificationSettings.value),
+    )
+    val uiState: StateFlow<NotificationSettingsUiState> = _uiState.asStateFlow()
 
     init {
+        // Repository の Flow を購読して、外部からの変更にも追随する
         viewModelScope.launch {
-            val loaded = repository.loadNotificationSettings()
-            _uiState.update { it.copy(settings = loaded, isLoading = false) }
+            repository.notificationSettings.collect { settings ->
+                _uiState.update { it.copy(settings = settings) }
+            }
         }
     }
 

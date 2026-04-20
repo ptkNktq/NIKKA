@@ -43,11 +43,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.nikka.core.model.NotificationSettings
-import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun NotificationSettingsScreen(
-    viewModel: SettingsViewModel = koinInject(),
+    viewModel: NotificationSettingsViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
 

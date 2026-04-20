@@ -3,6 +3,13 @@ package com.nikka.core.data
 import com.nikka.core.model.DailyTask
 import com.nikka.core.model.NotificationSettings
 import com.nikka.core.model.TaskGroup
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.LocalDate
@@ -20,6 +27,7 @@ import java.nio.file.StandardCopyOption
 // マルチプラットフォーム対応時は desktopMain に移動し、expect/actual で抽象化すること。
 class JsonTaskRepository(
     private val filePath: Path = defaultFilePath(),
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) : TaskRepository {
 
     private val json = Json {
@@ -27,6 +35,15 @@ class JsonTaskRepository(
         ignoreUnknownKeys = true
     }
     private val mutex = Mutex()
+
+    private val _notificationSettings = MutableStateFlow(NotificationSettings())
+    override val notificationSettings: StateFlow<NotificationSettings> = _notificationSettings.asStateFlow()
+
+    init {
+        scope.launch {
+            _notificationSettings.value = load().notificationSettings
+        }
+    }
 
     override suspend fun loadGroups(): List<TaskGroup> = load().groups
 
@@ -39,14 +56,12 @@ class JsonTaskRepository(
         }
     }
 
-    override suspend fun loadNotificationSettings(): NotificationSettings =
-        load().notificationSettings
-
     override suspend fun saveNotificationSettings(settings: NotificationSettings) {
         mutex.withLock {
             val current = readFile()
             writeFile(current.copy(notificationSettings = settings))
         }
+        _notificationSettings.value = settings
     }
 
     override suspend fun loadLastNotifiedDate(): LocalDate? = load().lastNotifiedDate
