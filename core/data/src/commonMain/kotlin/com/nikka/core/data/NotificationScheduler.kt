@@ -55,18 +55,19 @@ class NotificationScheduler(
         scope.launch { processCommands() }
     }
 
-    fun start() {
-        commands.trySend(Command.Start)
-    }
+    fun start() = send(Command.Start)
 
     /** ループのみ停止する。scope 自体は破棄しないため、start / onSettingsChanged で再開可能。 */
-    fun stop() {
-        commands.trySend(Command.Stop)
-    }
+    fun stop() = send(Command.Stop)
 
     /** 設定変更時に呼び出して再スケジュールする。 */
-    fun onSettingsChanged() {
-        commands.trySend(Command.Restart)
+    fun onSettingsChanged() = send(Command.Restart)
+
+    private fun send(command: Command) {
+        if (commands.trySend(command).isFailure) {
+            // close() 後の呼び出しは設計ミス。本来存在しないが将来の事故防止にログだけ残す
+            logger.warning("NotificationScheduler command dropped after close(): $command")
+        }
     }
 
     /** scope / channel ごと完全に解放する。以降 start/stop/onSettingsChanged は無視される。 */
@@ -162,6 +163,7 @@ class NotificationScheduler(
         return tasks.any { task -> !task.isCompleted || task.groupId in pendingResetGroupIds }
     }
 
+    // failureCount は「直前の送信が失敗していた回数」。0 = 直前成功 (初回発火含む)
     private fun failureBackoffMs(failureCount: Int): Long = when (failureCount) {
         0 -> POST_FIRE_COOLDOWN_MS
         1 -> FAILURE_BACKOFF_SHORT_MS
@@ -176,6 +178,8 @@ class NotificationScheduler(
 
         // しきい値
         private const val MAX_HOUR = 23
+
+        // 失敗 1→2→3→4 の累計で 5+15+15+15=50 分粘ってから当日を諦めて翌日の通知時刻を待つ
         private const val MAX_FAILURE_RETRIES = 4
     }
 }
