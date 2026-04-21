@@ -96,7 +96,12 @@ class NotificationScheduler(
         var failureCount = 0
         while (currentCoroutineContext().isActive) {
             val settings = repository.notificationSettings.value
-            if (!settings.enabled || settings.webhookUrl.isBlank()) return
+            if (!settings.enabled || settings.webhookUrl.isBlank()) {
+                // Repository 変更は VM 経由の onSettingsChanged() で loopJob が cancel → 再起動される。
+                // その到来まで長めに待機しつつ、万一の漏れも拾えるよう定期的に再チェックする。
+                delay(IDLE_CHECK_MS)
+                continue
+            }
             val waitMs = computeWaitMillis(settings.hour)
             if (waitMs > 0) delay(waitMs)
             val fired = try {
@@ -175,6 +180,7 @@ class NotificationScheduler(
         private const val POST_FIRE_COOLDOWN_MS = 60_000L
         private const val FAILURE_BACKOFF_SHORT_MS = 5 * 60_000L
         private const val FAILURE_BACKOFF_LONG_MS = 15 * 60_000L
+        private const val IDLE_CHECK_MS = 30 * 60_000L
 
         // しきい値
         private const val MAX_HOUR = 23
