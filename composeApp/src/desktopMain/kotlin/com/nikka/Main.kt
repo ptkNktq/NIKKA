@@ -14,51 +14,76 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.nikka.core.data.DiscordWebhookClient
+import com.nikka.core.data.NotificationScheduler
 import com.nikka.desktop.ui.component.NikkaWindowTopBar
+import com.nikka.di.appModule
+import org.koin.core.context.GlobalContext
+import org.koin.core.context.startKoin
+import org.koin.core.context.stopKoin
 
-fun main() = application {
-    val windowState = rememberWindowState(
-        size = DpSize(480.dp, 720.dp),
-        position = WindowPosition(Alignment.Center),
-    )
+fun main() {
+    startKoin { modules(appModule) }
+    application {
+        val windowState = rememberWindowState(
+            size = DpSize(WINDOW_WIDTH_DP.dp, WINDOW_HEIGHT_DP.dp),
+            position = WindowPosition(Alignment.Center),
+        )
 
-    var isVisible by remember { mutableStateOf(true) }
-    val icon = painterResource("icon.png")
+        var isVisible by remember { mutableStateOf(true) }
+        val icon = painterResource("icon.png")
 
-    Tray(
-        icon = icon,
-        tooltip = "NIKKA",
-        onAction = { isVisible = true },
-        menu = {
-            Item("開く", onClick = { isVisible = true })
-            Item("終了", onClick = ::exitApplication)
-        },
-    )
-
-    Window(
-        onCloseRequest = ::exitApplication,
-        title = "NIKKA",
-        icon = icon,
-        state = windowState,
-        visible = isVisible,
-        resizable = true,
-        undecorated = true,
-    ) {
-        LaunchedEffect(isVisible) {
-            if (isVisible) {
-                windowState.isMinimized = false
-                window.toFront()
-            }
+        val onExit: () -> Unit = {
+            releaseResources()
+            exitApplication()
         }
-        val scope = this
-        App(
-            topBar = { actions ->
-                scope.NikkaWindowTopBar(
-                    onMinimize = { isVisible = false },
-                    onClose = ::exitApplication,
-                    actions = actions,
-                )
+
+        Tray(
+            icon = icon,
+            tooltip = "NIKKA",
+            onAction = { isVisible = true },
+            menu = {
+                Item("開く", onClick = { isVisible = true })
+                Item("終了", onClick = onExit)
             },
         )
+
+        Window(
+            onCloseRequest = onExit,
+            title = "NIKKA",
+            icon = icon,
+            state = windowState,
+            visible = isVisible,
+            resizable = true,
+            undecorated = true,
+        ) {
+            LaunchedEffect(isVisible) {
+                if (isVisible) {
+                    windowState.isMinimized = false
+                    window.toFront()
+                }
+            }
+            val scope = this
+            App(
+                topBar = { actions ->
+                    scope.NikkaWindowTopBar(
+                        onMinimize = { isVisible = false },
+                        onClose = onExit,
+                        actions = actions,
+                    )
+                },
+            )
+        }
     }
 }
+
+// アプリ終了時に DI で保持している長命リソース (Scheduler の scope / HttpClient) を明示解放する
+private fun releaseResources() {
+    val koin = GlobalContext.getOrNull() ?: return
+    runCatching { koin.get<NotificationScheduler>().close() }
+    runCatching { koin.get<DiscordWebhookClient>().close() }
+    stopKoin()
+}
+
+private const val WINDOW_WIDTH_DP = 480
+private const val WINDOW_HEIGHT_DP = 720

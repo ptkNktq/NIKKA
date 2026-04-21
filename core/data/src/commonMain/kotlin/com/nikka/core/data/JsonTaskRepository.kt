@@ -1,7 +1,12 @@
 package com.nikka.core.data
 
 import com.nikka.core.model.DailyTask
+import com.nikka.core.model.NotificationSettings
 import com.nikka.core.model.TaskGroup
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.LocalDate
@@ -21,8 +26,16 @@ class JsonTaskRepository(
     private val filePath: Path = defaultFilePath(),
 ) : TaskRepository {
 
-    private val json = Json { prettyPrint = true }
+    private val json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+    }
     private val mutex = Mutex()
+
+    private val _notificationSettings: MutableStateFlow<NotificationSettings> =
+        // コンストラクタで初期値をロード完了させ、VM / Scheduler 初期化との race を排除する。
+        MutableStateFlow(runBlocking { load().notificationSettings })
+    override val notificationSettings: StateFlow<NotificationSettings> = _notificationSettings.asStateFlow()
 
     override suspend fun loadGroups(): List<TaskGroup> = load().groups
 
@@ -30,7 +43,26 @@ class JsonTaskRepository(
 
     override suspend fun saveAll(groups: List<TaskGroup>, tasks: List<DailyTask>) {
         mutex.withLock {
-            writeFile(NikkaData(groups = groups, tasks = tasks))
+            val current = readFile()
+            writeFile(current.copy(groups = groups, tasks = tasks))
+        }
+    }
+
+    override suspend fun saveNotificationSettings(settings: NotificationSettings) {
+        mutex.withLock {
+            val current = readFile()
+            writeFile(current.copy(notificationSettings = settings))
+            // ファイル書き込み成功と StateFlow 更新を原子的に扱う
+            _notificationSettings.value = settings
+        }
+    }
+
+    override suspend fun loadLastNotifiedDate(): LocalDate? = load().lastNotifiedDate
+
+    override suspend fun saveLastNotifiedDate(date: LocalDate) {
+        mutex.withLock {
+            val current = readFile()
+            writeFile(current.copy(lastNotifiedDate = date))
         }
     }
 
