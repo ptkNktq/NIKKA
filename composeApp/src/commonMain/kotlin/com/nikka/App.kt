@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.useResource
+import com.nikka.core.data.DiscordWebhookClient
 import com.nikka.core.data.NotificationScheduler
 import com.nikka.core.ui.component.LocalTopBarSlot
 import com.nikka.core.ui.component.TopBarSlot
@@ -46,9 +47,13 @@ fun App(
     KoinApplication(application = { modules(appModule) }) {
         NikkaTheme {
             val scheduler: NotificationScheduler = koinInject()
-            DisposableEffect(scheduler) {
+            val webhookClient: DiscordWebhookClient = koinInject()
+            DisposableEffect(Unit) {
                 scheduler.start()
-                onDispose { scheduler.stop() }
+                onDispose {
+                    scheduler.close()
+                    webhookClient.close()
+                }
             }
 
             val topBarSlot = remember { TopBarSlot() }

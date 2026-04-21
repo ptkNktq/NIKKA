@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -37,7 +38,7 @@ class NotificationScheduler(
     private val webhookClient: DiscordWebhookClient,
     private val clock: Clock = Clock.System,
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
-) {
+) : AutoCloseable {
 
     private sealed interface Command {
         data object Start : Command
@@ -66,6 +67,12 @@ class NotificationScheduler(
     /** 設定変更時に呼び出して再スケジュールする。 */
     fun onSettingsChanged() {
         commands.trySend(Command.Restart)
+    }
+
+    /** scope / channel ごと完全に解放する。以降 start/stop/onSettingsChanged は無視される。 */
+    override fun close() {
+        commands.close()
+        scope.cancel()
     }
 
     private suspend fun processCommands() {
@@ -156,16 +163,18 @@ class NotificationScheduler(
     }
 
     private fun failureBackoffMs(failureCount: Int): Long = when (failureCount) {
-        // 成功後 / 失敗初回は同じ 1 分クールダウン (連続トリガを避ける素の間隔)
-        0, 1 -> POST_FIRE_COOLDOWN_MS
-        2 -> FAILURE_BACKOFF_2_MS
-        else -> FAILURE_BACKOFF_N_MS
+        0 -> POST_FIRE_COOLDOWN_MS
+        1 -> FAILURE_BACKOFF_SHORT_MS
+        else -> FAILURE_BACKOFF_LONG_MS
     }
 
     companion object {
+        // 待機間隔 (ms)
         private const val POST_FIRE_COOLDOWN_MS = 60_000L
-        private const val FAILURE_BACKOFF_2_MS = 5 * 60_000L
-        private const val FAILURE_BACKOFF_N_MS = 15 * 60_000L
+        private const val FAILURE_BACKOFF_SHORT_MS = 5 * 60_000L
+        private const val FAILURE_BACKOFF_LONG_MS = 15 * 60_000L
+
+        // しきい値
         private const val MAX_HOUR = 23
         private const val MAX_FAILURE_RETRIES = 4
     }

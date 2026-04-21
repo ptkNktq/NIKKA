@@ -12,7 +12,7 @@ import kotlinx.serialization.json.Json
 
 class DiscordWebhookClient internal constructor(
     private val httpClient: HttpClient,
-) {
+) : AutoCloseable {
 
     @Serializable
     private data class WebhookPayload(val content: String)
@@ -29,5 +29,9 @@ class DiscordWebhookClient internal constructor(
         check(response.status.isSuccess()) {
             "Discord webhook failed: ${response.status} ${response.bodyAsText()}"
         }
+    }
+
+    override fun close() {
+        httpClient.close()
     }
 }
