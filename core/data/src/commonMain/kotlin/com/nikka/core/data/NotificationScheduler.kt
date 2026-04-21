@@ -5,13 +5,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
@@ -28,6 +29,8 @@ import java.util.logging.Logger
  * - 1 日 1 回まで通知する (当日の通知済みフラグは Repository に永続化)。
  * - 未達成タスクが 0 件の場合は送信せず、通知済みフラグだけ立てる (当日再度増えても再送しない)。
  * - 当日の通知時刻を過ぎてから設定を ON にした場合、今日分が未送信なら即時送信する。
+ *
+ * start / stop / onSettingsChanged は [Channel] で順序を保証してシリアライズする。
  */
 class NotificationScheduler(
     private val repository: TaskRepository,
@@ -36,45 +39,59 @@ class NotificationScheduler(
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) {
 
+    private sealed interface Command {
+        data object Start : Command
+        data object Stop : Command
+        data object Restart : Command
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val mutex = Mutex()
+    private val commands = Channel<Command>(Channel.UNLIMITED)
     private var loopJob: Job? = null
     private val logger: Logger = Logger.getLogger(NotificationScheduler::class.java.name)
 
+    init {
+        scope.launch { processCommands() }
+    }
+
     fun start() {
-        scope.launch { restart() }
+        commands.trySend(Command.Start)
     }
 
     /** ループのみ停止する。scope 自体は破棄しないため、start / onSettingsChanged で再開可能。 */
     fun stop() {
-        scope.launch {
-            mutex.withLock {
-                loopJob?.cancel()
-                loopJob = null
-            }
-        }
+        commands.trySend(Command.Stop)
     }
 
     /** 設定変更時に呼び出して再スケジュールする。 */
     fun onSettingsChanged() {
-        scope.launch { restart() }
+        commands.trySend(Command.Restart)
     }
 
-    private suspend fun restart() {
-        mutex.withLock {
-            loopJob?.cancel()
-            loopJob = scope.launch { runLoop() }
+    private suspend fun processCommands() {
+        for (cmd in commands) {
+            when (cmd) {
+                Command.Start, Command.Restart -> {
+                    loopJob?.cancel()
+                    loopJob = scope.launch { runLoop() }
+                }
+                Command.Stop -> {
+                    loopJob?.cancel()
+                    loopJob = null
+                }
+            }
         }
     }
 
     @Suppress("TooGenericExceptionCaught")
     private suspend fun runLoop() {
-        while (scope.isActive) {
+        var failureCount = 0
+        while (currentCoroutineContext().isActive) {
             val settings = repository.notificationSettings.value
             if (!settings.enabled || settings.webhookUrl.isBlank()) return
             val waitMs = computeWaitMillis(settings.hour)
             if (waitMs > 0) delay(waitMs)
-            try {
+            val fired = try {
                 fireIfNeeded(
                     webhookUrl = settings.webhookUrl,
                     message = settings.message ?: NotificationSettings.DEFAULT_MESSAGE,
@@ -82,9 +99,16 @@ class NotificationScheduler(
             } catch (e: Exception) {
                 // 通知失敗は次サイクルで再試行。原因切り分けのためログ出力のみ行う。
                 logger.log(Level.WARNING, "Failed to send scheduled notification", e)
+                false
             }
-            // 翌日まで少し進めてから再計算 (同じ時刻にヒットし続けるのを防ぐ)
-            delay(POST_FIRE_COOLDOWN_MS)
+            failureCount = if (fired) 0 else failureCount + 1
+            if (failureCount >= MAX_FAILURE_RETRIES) {
+                // これ以上連続失敗する URL なら当日は諦めて翌日の通知時刻を待つ
+                val today = clock.now().toLocalDateTime(timeZone).date
+                repository.saveLastNotifiedDate(today)
+                failureCount = 0
+            }
+            delay(failureBackoffMs(failureCount))
         }
     }
 
@@ -103,25 +127,25 @@ class NotificationScheduler(
         return (target - nowInstant).inWholeMilliseconds.coerceAtLeast(0)
     }
 
-    private suspend fun fireIfNeeded(webhookUrl: String, message: String) {
+    private suspend fun fireIfNeeded(webhookUrl: String, message: String): Boolean {
         val now = clock.now().toLocalDateTime(timeZone)
         val today = now.date
-        if (repository.loadLastNotifiedDate() == today) return
-        if (!hasUncompletedTasks(now.hour, today)) {
-            repository.saveLastNotifiedDate(today)
-            return
+        if (repository.loadLastNotifiedDate() == today) return true
+        val sent = if (hasUncompletedTasks(now.hour, today)) {
+            webhookClient.send(webhookUrl, message).isSuccess
+        } else {
+            // 未達成 0 件の日は送らない。当日再度増えても再通知しない仕様なのでフラグだけ立てる
+            true
         }
-        val result = webhookClient.send(webhookUrl, message)
-        if (result.isSuccess) {
-            repository.saveLastNotifiedDate(today)
-        }
+        if (sent) repository.saveLastNotifiedDate(today)
+        return sent
     }
 
     /**
      * HomeViewModel が動いていない間に resetHour が到達した場合、[com.nikka.core.model.DailyTask.isCompleted]
      * は前日のまま = true のことがある。そのようなグループのタスクは「未完了扱い」で判定する。
      */
-    private suspend fun hasUncompletedTasks(currentHour: Int, today: kotlinx.datetime.LocalDate): Boolean {
+    private suspend fun hasUncompletedTasks(currentHour: Int, today: LocalDate): Boolean {
         val groups = repository.loadGroups()
         val tasks = repository.loadTasks()
         val pendingResetGroupIds = groups.filter { group ->
@@ -131,8 +155,19 @@ class NotificationScheduler(
         return tasks.any { task -> !task.isCompleted || task.groupId in pendingResetGroupIds }
     }
 
+    private fun failureBackoffMs(failureCount: Int): Long = when (failureCount) {
+        0 -> POST_FIRE_COOLDOWN_MS
+        1 -> FAILURE_BACKOFF_1_MS
+        2 -> FAILURE_BACKOFF_2_MS
+        else -> FAILURE_BACKOFF_N_MS
+    }
+
     companion object {
         private const val POST_FIRE_COOLDOWN_MS = 60_000L
+        private const val FAILURE_BACKOFF_1_MS = 60_000L
+        private const val FAILURE_BACKOFF_2_MS = 5 * 60_000L
+        private const val FAILURE_BACKOFF_N_MS = 15 * 60_000L
         private const val MAX_HOUR = 23
+        private const val MAX_FAILURE_RETRIES = 4
     }
 }

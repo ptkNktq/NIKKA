@@ -3,13 +3,10 @@ package com.nikka.core.data
 import com.nikka.core.model.DailyTask
 import com.nikka.core.model.NotificationSettings
 import com.nikka.core.model.TaskGroup
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.LocalDate
@@ -27,7 +24,6 @@ import java.nio.file.StandardCopyOption
 // マルチプラットフォーム対応時は desktopMain に移動し、expect/actual で抽象化すること。
 class JsonTaskRepository(
     private val filePath: Path = defaultFilePath(),
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) : TaskRepository {
 
     private val json = Json {
@@ -36,14 +32,10 @@ class JsonTaskRepository(
     }
     private val mutex = Mutex()
 
-    private val _notificationSettings = MutableStateFlow(NotificationSettings())
+    private val _notificationSettings: MutableStateFlow<NotificationSettings> =
+        // コンストラクタで初期値をロード完了させ、VM / Scheduler 初期化との race を排除する。
+        MutableStateFlow(runBlocking { load().notificationSettings })
     override val notificationSettings: StateFlow<NotificationSettings> = _notificationSettings.asStateFlow()
-
-    init {
-        scope.launch {
-            _notificationSettings.value = load().notificationSettings
-        }
-    }
 
     override suspend fun loadGroups(): List<TaskGroup> = load().groups
 
