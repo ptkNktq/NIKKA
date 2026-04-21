@@ -20,17 +20,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.useResource
-import com.nikka.core.data.DiscordWebhookClient
 import com.nikka.core.data.NotificationScheduler
 import com.nikka.core.ui.component.LocalTopBarSlot
 import com.nikka.core.ui.component.TopBarSlot
 import com.nikka.core.ui.theme.NikkaTheme
-import com.nikka.di.appModule
 import com.nikka.feature.home.HomeScreen
 import com.nikka.feature.license.LicenseScreen
 import com.nikka.feature.settings.NotificationSettingsScreen
 import com.nikka.feature.settings.SettingsScreen
-import org.koin.compose.KoinApplication
+import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 
 private enum class Screen {
@@ -44,16 +42,12 @@ private enum class Screen {
 fun App(
     topBar: @Composable (actions: @Composable () -> Unit) -> Unit = {},
 ) {
-    KoinApplication(application = { modules(appModule) }) {
+    KoinContext {
         NikkaTheme {
             val scheduler: NotificationScheduler = koinInject()
-            val webhookClient: DiscordWebhookClient = koinInject()
             DisposableEffect(Unit) {
                 scheduler.start()
-                onDispose {
-                    scheduler.close()
-                    webhookClient.close()
-                }
+                onDispose { scheduler.stop() }
             }
 
             val topBarSlot = remember { TopBarSlot() }
