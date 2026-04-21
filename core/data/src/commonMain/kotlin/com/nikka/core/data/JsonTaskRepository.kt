@@ -52,8 +52,9 @@ class JsonTaskRepository(
         mutex.withLock {
             val current = readFile()
             writeFile(current.copy(notificationSettings = settings))
+            // ファイル書き込み成功と StateFlow 更新を原子的に扱う
+            _notificationSettings.value = settings
         }
-        _notificationSettings.value = settings
     }
 
     override suspend fun loadLastNotifiedDate(): LocalDate? = load().lastNotifiedDate

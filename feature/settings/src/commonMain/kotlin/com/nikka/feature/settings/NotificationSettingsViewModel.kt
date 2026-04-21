@@ -113,7 +113,7 @@ class NotificationSettingsViewModel(
     private fun shouldReschedule(prev: NotificationSettings, next: NotificationSettings): Boolean =
         prev.enabled != next.enabled ||
             prev.hour != next.hour ||
-            prev.webhookUrl.isBlank() != next.webhookUrl.isBlank()
+            prev.webhookUrl != next.webhookUrl
 
     companion object {
         private const val SAVE_DEBOUNCE_MS = 300L

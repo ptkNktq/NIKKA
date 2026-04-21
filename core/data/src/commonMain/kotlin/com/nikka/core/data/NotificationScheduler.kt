@@ -156,15 +156,14 @@ class NotificationScheduler(
     }
 
     private fun failureBackoffMs(failureCount: Int): Long = when (failureCount) {
-        0 -> POST_FIRE_COOLDOWN_MS
-        1 -> FAILURE_BACKOFF_1_MS
+        // 成功後 / 失敗初回は同じ 1 分クールダウン (連続トリガを避ける素の間隔)
+        0, 1 -> POST_FIRE_COOLDOWN_MS
         2 -> FAILURE_BACKOFF_2_MS
         else -> FAILURE_BACKOFF_N_MS
     }
 
     companion object {
         private const val POST_FIRE_COOLDOWN_MS = 60_000L
-        private const val FAILURE_BACKOFF_1_MS = 60_000L
         private const val FAILURE_BACKOFF_2_MS = 5 * 60_000L
         private const val FAILURE_BACKOFF_N_MS = 15 * 60_000L
         private const val MAX_HOUR = 23
