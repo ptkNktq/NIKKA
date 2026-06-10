@@ -221,6 +221,7 @@ private fun NotificationHourRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(top = 8.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(vertical = 12.dp),
