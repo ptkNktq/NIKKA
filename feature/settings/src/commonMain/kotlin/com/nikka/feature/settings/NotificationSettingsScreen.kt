@@ -106,12 +106,6 @@ private fun NotificationFields(
         singleLine = true,
         enabled = settings.enabled,
     )
-    TestSendRow(
-        urlPresent = settings.webhookUrl.isNotBlank(),
-        status = testSendStatus,
-        errorMessage = testSendError,
-        onClick = onTestSendClick,
-    )
     OutlinedTextField(
         value = settings.message.orEmpty(),
         onValueChange = onMessageChange,
@@ -125,6 +119,12 @@ private fun NotificationFields(
         hour = settings.hour,
         enabled = settings.enabled,
         onClick = onHourClick,
+    )
+    TestSendRow(
+        urlPresent = settings.webhookUrl.isNotBlank(),
+        status = testSendStatus,
+        errorMessage = testSendError,
+        onClick = onTestSendClick,
     )
 }
 
