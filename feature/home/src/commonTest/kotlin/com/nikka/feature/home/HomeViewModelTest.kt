@@ -479,6 +479,187 @@ class HomeViewModelTest {
         assertTrue(vm.uiState.value.tasks.first().isCompleted)
     }
 
+    // --- Weekly reset tests ---
+
+    // 2026-04-06 は月曜日
+
+    @Test
+    fun `weekly reset triggers on reset day after reset hour`() = runTest {
+        val clock = fixedClock("2026-04-06T10:00:00Z")
+        repository.saveAll(
+            groups = listOf(
+                TaskGroup(
+                    id = "g1",
+                    name = "原神",
+                    resetHour = 5,
+                    resetDayOfWeek = 1,
+                    lastWeeklyResetDate = LocalDate(2026, 3, 30),
+                ),
+            ),
+            tasks = listOf(
+                Task(id = "w1", groupId = "g1", title = "週ボス", isCompleted = true, type = TaskType.WEEKLY),
+            ),
+        )
+        val vm = HomeViewModel(repository, clock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.tasks.first().isCompleted)
+        assertEquals(LocalDate(2026, 4, 6), vm.uiState.value.groups.first().lastWeeklyResetDate)
+    }
+
+    @Test
+    fun `weekly reset does not trigger before reset hour on reset day`() = runTest {
+        val clock = fixedClock("2026-04-06T02:00:00Z")
+        repository.saveAll(
+            groups = listOf(
+                TaskGroup(
+                    id = "g1",
+                    name = "原神",
+                    resetHour = 5,
+                    resetDayOfWeek = 1,
+                    lastWeeklyResetDate = LocalDate(2026, 3, 30),
+                ),
+            ),
+            tasks = listOf(
+                Task(id = "w1", groupId = "g1", title = "週ボス", isCompleted = true, type = TaskType.WEEKLY),
+            ),
+        )
+        val vm = HomeViewModel(repository, clock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.tasks.first().isCompleted)
+    }
+
+    @Test
+    fun `weekly reset does not trigger twice in the same week`() = runTest {
+        // 水曜日。直近の月曜 (4/6) は実施済み
+        val clock = fixedClock("2026-04-08T10:00:00Z")
+        repository.saveAll(
+            groups = listOf(
+                TaskGroup(
+                    id = "g1",
+                    name = "原神",
+                    resetHour = 5,
+                    resetDayOfWeek = 1,
+                    lastWeeklyResetDate = LocalDate(2026, 4, 6),
+                ),
+            ),
+            tasks = listOf(
+                Task(id = "w1", groupId = "g1", title = "週ボス", isCompleted = true, type = TaskType.WEEKLY),
+            ),
+        )
+        val vm = HomeViewModel(repository, clock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.tasks.first().isCompleted)
+    }
+
+    @Test
+    fun `weekly reset triggers when app is opened later in the week`() = runTest {
+        // 水曜日に起動。直近の月曜 (4/6) が未実施なのでリセットされる
+        val clock = fixedClock("2026-04-08T10:00:00Z")
+        repository.saveAll(
+            groups = listOf(
+                TaskGroup(
+                    id = "g1",
+                    name = "原神",
+                    resetHour = 5,
+                    resetDayOfWeek = 1,
+                    lastWeeklyResetDate = LocalDate(2026, 3, 30),
+                ),
+            ),
+            tasks = listOf(
+                Task(id = "w1", groupId = "g1", title = "週ボス", isCompleted = true, type = TaskType.WEEKLY),
+            ),
+        )
+        val vm = HomeViewModel(repository, clock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.tasks.first().isCompleted)
+        assertEquals(LocalDate(2026, 4, 6), vm.uiState.value.groups.first().lastWeeklyResetDate)
+    }
+
+    @Test
+    fun `weekly reset does not reset daily tasks`() = runTest {
+        // resetHour 未設定 (週次は 0 時扱い) のため日次リセットは発生しない
+        val clock = fixedClock("2026-04-06T02:00:00Z")
+        repository.saveAll(
+            groups = listOf(
+                TaskGroup(
+                    id = "g1",
+                    name = "原神",
+                    resetDayOfWeek = 1,
+                    lastWeeklyResetDate = LocalDate(2026, 3, 30),
+                ),
+            ),
+            tasks = listOf(
+                Task(id = "d1", groupId = "g1", title = "デイリー", isCompleted = true),
+                Task(id = "w1", groupId = "g1", title = "週ボス", isCompleted = true, type = TaskType.WEEKLY),
+            ),
+        )
+        val vm = HomeViewModel(repository, clock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val tasks = vm.uiState.value.tasks
+        assertTrue(tasks.first { it.id == "d1" }.isCompleted)
+        assertFalse(tasks.first { it.id == "w1" }.isCompleted)
+    }
+
+    @Test
+    fun `setResetDayOfWeek keeps current week progress until next reset day`() = runTest {
+        // 水曜日に曜日を設定しても、その週の進捗は消えない。翌週の月曜にリセットされる
+        val mutableClock = object : Clock {
+            var instant: Instant = Instant.parse("2026-04-08T10:00:00Z")
+            override fun now(): Instant = instant
+        }
+        repository.saveAll(
+            groups = listOf(TaskGroup(id = "g1", name = "原神")),
+            tasks = listOf(
+                Task(id = "w1", groupId = "g1", title = "週ボス", isCompleted = true, type = TaskType.WEEKLY),
+            ),
+        )
+        val vm = HomeViewModel(repository, mutableClock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.setResetDayOfWeek("g1", 1)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, vm.uiState.value.groups.first().resetDayOfWeek)
+
+        vm.refreshAutoReset()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.tasks.first().isCompleted)
+
+        // 翌週月曜になったらリセットされる
+        mutableClock.instant = Instant.parse("2026-04-13T10:00:00Z")
+        vm.refreshAutoReset()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse(vm.uiState.value.tasks.first().isCompleted)
+    }
+
+    @Test
+    fun `setResetDayOfWeek with null clears day and last reset date`() = runTest {
+        repository.saveAll(
+            groups = listOf(
+                TaskGroup(
+                    id = "g1",
+                    name = "原神",
+                    resetDayOfWeek = 1,
+                    lastWeeklyResetDate = LocalDate(2026, 4, 6),
+                ),
+            ),
+            tasks = emptyList(),
+        )
+        val vm = HomeViewModel(repository, fixedClock("2026-04-08T10:00:00Z"), utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.setResetDayOfWeek("g1", null)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val group = vm.uiState.value.groups.first()
+        assertNull(group.resetDayOfWeek)
+        assertNull(group.lastWeeklyResetDate)
+    }
+
     // --- Manual refresh tests ---
 
     @Test

@@ -14,7 +14,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -29,6 +33,7 @@ data class HomeUiState(
     val addTaskTargetType: TaskType = TaskType.DAILY,
     val deleteGroupConfirmId: String? = null,
     val resetHourTargetGroupId: String? = null,
+    val resetDayOfWeekTargetGroupId: String? = null,
     val isLoading: Boolean = true,
 )
 
@@ -109,23 +114,54 @@ class HomeViewModel(
         val now = clock.now().toLocalDateTime(timeZone)
         val today = now.date
         val currentHour = now.hour
-        val resetGroupIds = groups.filter { group ->
+        val dailyResetGroupIds = groups.filter { group ->
             val hour = group.resetHour ?: return@filter false
             currentHour >= hour && group.lastResetDate != today
         }.map { it.id }.toSet()
-        if (resetGroupIds.isEmpty()) return AutoResetResult(groups, tasks, emptySet())
+        // 週次リセット: 直近のリセット予定日が到来していて、まだその週の分を実施していないグループ
+        val weeklyResetDates = groups.mapNotNull { group ->
+            val resetDate = latestWeeklyResetDate(today, currentHour, group) ?: return@mapNotNull null
+            val last = group.lastWeeklyResetDate
+            if (last == null || last < resetDate) group.id to resetDate else null
+        }.toMap()
+        if (dailyResetGroupIds.isEmpty() && weeklyResetDates.isEmpty()) {
+            return AutoResetResult(groups, tasks, emptySet())
+        }
         val newGroups = groups.map { group ->
-            if (group.id in resetGroupIds) group.copy(lastResetDate = today) else group
+            var updated = group
+            if (group.id in dailyResetGroupIds) updated = updated.copy(lastResetDate = today)
+            weeklyResetDates[group.id]?.let { updated = updated.copy(lastWeeklyResetDate = it) }
+            updated
         }
-        // 日次の自動リセット対象は日課のみ。週課のリセットは週次ロジックで扱う
         val newTasks = tasks.map { task ->
-            if (task.groupId in resetGroupIds && task.type == TaskType.DAILY) {
-                task.copy(isCompleted = false)
-            } else {
-                task
+            val shouldReset = when (task.type) {
+                TaskType.DAILY -> task.groupId in dailyResetGroupIds
+                TaskType.WEEKLY -> task.groupId in weeklyResetDates
             }
+            if (shouldReset) task.copy(isCompleted = false) else task
         }
-        return AutoResetResult(newGroups, newTasks, resetGroupIds)
+        return AutoResetResult(newGroups, newTasks, dailyResetGroupIds + weeklyResetDates.keys)
+    }
+
+    /**
+     * 直近に到来した週次リセット予定日を返す。リセット曜日が未設定なら null。
+     * リセット時刻は日課リセット時刻 (resetHour) を流用し、未設定なら 0 時とする。
+     */
+    private fun latestWeeklyResetDate(
+        today: LocalDate,
+        currentHour: Int,
+        group: TaskGroup,
+    ): LocalDate? {
+        val isoDay = group.resetDayOfWeek ?: return null
+        val resetHour = group.resetHour ?: 0
+        val daysSinceResetDay = (today.dayOfWeek.isoDayNumber - isoDay + DAYS_IN_WEEK) % DAYS_IN_WEEK
+        val candidate = today.minus(daysSinceResetDay, DateTimeUnit.DAY)
+        // リセット曜日当日でまだ時刻前なら、1 週間前が直近のリセット予定日
+        return if (daysSinceResetDay == 0 && currentHour < resetHour) {
+            candidate.minus(DAYS_IN_WEEK, DateTimeUnit.DAY)
+        } else {
+            candidate
+        }
     }
 
     fun addGroup(name: String) {
@@ -315,10 +351,48 @@ class HomeViewModel(
         persistAll()
     }
 
+    fun showResetDayOfWeekDialog(groupId: String) {
+        _uiState.update { it.copy(resetDayOfWeekTargetGroupId = groupId) }
+    }
+
+    fun dismissResetDayOfWeekDialog() {
+        _uiState.update { it.copy(resetDayOfWeekTargetGroupId = null) }
+    }
+
+    fun setResetDayOfWeek(groupId: String, isoDayOfWeek: Int?) {
+        val now = clock.now().toLocalDateTime(timeZone)
+        _uiState.update { state ->
+            state.copy(
+                groups = state.groups.map { group ->
+                    when {
+                        group.id != groupId -> group
+                        isoDayOfWeek == null -> group.copy(
+                            resetDayOfWeek = null,
+                            lastWeeklyResetDate = null,
+                        )
+                        else -> {
+                            // 設定時点の週課の進捗を消さないよう、直近のリセット予定日を実施済み扱いにする
+                            val configured = group.copy(resetDayOfWeek = isoDayOfWeek)
+                            configured.copy(
+                                lastWeeklyResetDate = latestWeeklyResetDate(now.date, now.hour, configured),
+                            )
+                        }
+                    }
+                },
+                resetDayOfWeekTargetGroupId = null,
+            )
+        }
+        persistAll()
+    }
+
     private fun persistAll() {
         val snapshot = _uiState.value
         viewModelScope.launch {
             repository.saveAll(snapshot.groups, snapshot.tasks)
         }
+    }
+
+    companion object {
+        private const val DAYS_IN_WEEK = 7
     }
 }
