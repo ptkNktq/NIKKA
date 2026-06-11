@@ -8,4 +8,5 @@ data class Task(
     val groupId: String,
     val title: String,
     val isCompleted: Boolean = false,
+    val type: TaskType = TaskType.DAILY,
 )
