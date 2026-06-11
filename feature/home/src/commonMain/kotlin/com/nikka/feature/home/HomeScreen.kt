@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
+import com.nikka.core.model.TaskType
 import com.nikka.core.ui.component.ProvideTopBarActions
 import com.nikka.core.ui.theme.StatusGreen
 import com.nikka.core.ui.theme.StatusRed
@@ -137,14 +138,14 @@ fun HomeScreen(
 private fun HomeContent(
     uiState: HomeUiState,
     onToggleTask: (String) -> Unit,
-    onShowAddTask: (String) -> Unit,
+    onShowAddTask: (String, TaskType) -> Unit,
     onRemoveTask: (String) -> Unit,
     onRemoveGroup: (String) -> Unit,
     onToggleGroupCollapse: (String) -> Unit,
     onResetGroup: (String) -> Unit,
     onMoveGroup: (Int, Int) -> Unit,
     onSettleDrag: () -> Unit,
-    onMoveTask: (String, Int, Int) -> Unit,
+    onMoveTask: (String, TaskType, Int, Int) -> Unit,
     onSetResetHour: (String) -> Unit,
 ) {
     if (uiState.groups.isEmpty()) {
@@ -170,7 +171,7 @@ private fun HomeContent(
                         isCollapsed = group.id in uiState.collapsedGroupIds,
                         onToggleCollapse = { onToggleGroupCollapse(group.id) },
                         onToggleTask = onToggleTask,
-                        onAddTask = { onShowAddTask(group.id) },
+                        onAddTask = { type -> onShowAddTask(group.id, type) },
                         onRemoveTask = onRemoveTask,
                         onRemoveGroup = { onRemoveGroup(group.id) },
                         onResetGroup = { onResetGroup(group.id) },
@@ -200,11 +201,15 @@ private fun HomeDialogs(uiState: HomeUiState, viewModel: HomeViewModel) {
     }
     val addTaskGroupId = uiState.addTaskTargetGroupId
     if (uiState.isAddTaskDialogVisible && addTaskGroupId != null) {
+        val addTaskType = uiState.addTaskTargetType
         InputDialog(
-            title = "日課を追加",
-            placeholder = "例: デイリー任務、樹脂消費...",
+            title = "${addTaskType.label}を追加",
+            placeholder = when (addTaskType) {
+                TaskType.DAILY -> "例: デイリー任務、樹脂消費..."
+                TaskType.WEEKLY -> "例: 週ボス討伐、紀行ミッション..."
+            },
             confirmText = "追加",
-            onConfirm = { title -> viewModel.addTask(addTaskGroupId, title) },
+            onConfirm = { title -> viewModel.addTask(addTaskGroupId, title, addTaskType) },
             onDismiss = viewModel::dismissAddTaskDialog,
         )
     }
@@ -214,7 +219,7 @@ private fun HomeDialogs(uiState: HomeUiState, viewModel: HomeViewModel) {
         AlertDialog(
             onDismissRequest = viewModel::dismissDeleteGroupConfirm,
             title = { Text("グループを削除") },
-            text = { Text("「$groupName」とその日課をすべて削除しますか？") },
+            text = { Text("「$groupName」とその日課・週課をすべて削除しますか？") },
             confirmButton = {
                 Button(
                     onClick = viewModel::confirmDeleteGroup,
@@ -282,12 +287,12 @@ private fun GroupCard(
     isCollapsed: Boolean,
     onToggleCollapse: () -> Unit,
     onToggleTask: (String) -> Unit,
-    onAddTask: () -> Unit,
+    onAddTask: (TaskType) -> Unit,
     onRemoveTask: (String) -> Unit,
     onRemoveGroup: () -> Unit,
     onResetGroup: () -> Unit,
     onSetResetHour: () -> Unit,
-    onMoveTask: (String, Int, Int) -> Unit,
+    onMoveTask: (String, TaskType, Int, Int) -> Unit,
     dragModifier: Modifier = Modifier,
 ) {
     val allCompleted = tasks.isNotEmpty() && tasks.all { it.isCompleted }
@@ -330,7 +335,7 @@ private fun GroupCardHeader(
     allCompleted: Boolean,
     isCollapsed: Boolean,
     onToggleCollapse: () -> Unit,
-    onAddTask: () -> Unit,
+    onAddTask: (TaskType) -> Unit,
     onResetGroup: () -> Unit,
     onRemoveGroup: () -> Unit,
     onSetResetHour: () -> Unit,
@@ -366,9 +371,9 @@ private fun GroupCardHeader(
             offset = contextMenuOffset,
             resetHour = group.resetHour,
             onDismiss = { showContextMenu = false },
-            onAddTask = {
+            onAddTask = { type ->
                 showContextMenu = false
-                onAddTask()
+                onAddTask(type)
             },
             onSetResetHour = {
                 showContextMenu = false
@@ -483,7 +488,7 @@ private fun GroupContextMenu(
     offset: DpOffset = DpOffset.Zero,
     resetHour: Int?,
     onDismiss: () -> Unit,
-    onAddTask: () -> Unit,
+    onAddTask: (TaskType) -> Unit,
     onSetResetHour: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -494,18 +499,8 @@ private fun GroupContextMenu(
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
     ) {
-        DropdownMenuItem(
-            text = { Text("日課を追加") },
-            onClick = onAddTask,
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Rounded.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            },
-        )
+        AddTaskMenuItem(label = "日課を追加", onClick = { onAddTask(TaskType.DAILY) })
+        AddTaskMenuItem(label = "週課を追加", onClick = { onAddTask(TaskType.WEEKLY) })
         DropdownMenuItem(
             text = {
                 val label = if (resetHour != null) {
@@ -543,12 +538,28 @@ private fun GroupContextMenu(
 }
 
 @Composable
+private fun AddTaskMenuItem(label: String, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(label) },
+        onClick = onClick,
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Rounded.Add,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+    )
+}
+
+@Composable
 private fun GroupCardBody(
     group: TaskGroup,
     tasks: List<Task>,
     onToggleTask: (String) -> Unit,
     onRemoveTask: (String) -> Unit,
-    onMoveTask: (String, Int, Int) -> Unit,
+    onMoveTask: (String, TaskType, Int, Int) -> Unit,
 ) {
     if (tasks.isEmpty()) {
         Text(
@@ -558,22 +569,62 @@ private fun GroupCardBody(
             modifier = Modifier.padding(start = 22.dp, top = 4.dp),
         )
     } else {
-        ReorderableColumn(
-            list = tasks,
-            onSettle = { fromIndex, toIndex ->
-                onMoveTask(group.id, fromIndex, toIndex)
-            },
-            modifier = Modifier.padding(top = 4.dp),
-        ) { _, task, _ ->
-            key(task.id) {
-                ReorderableItem {
-                    TaskRow(
-                        task = task,
-                        onToggle = { onToggleTask(task.id) },
-                        onRemove = { onRemoveTask(task.id) },
-                        dragModifier = Modifier.draggableHandle(),
-                    )
+        val sections = TaskType.entries
+            .map { type -> type to tasks.filter { it.type == type } }
+            .filter { (_, sectionTasks) -> sectionTasks.isNotEmpty() }
+        // 単一種別のみのグループはヘッダーを出さず従来通りの見た目にする
+        val showHeaders = sections.size > 1
+        Column(modifier = Modifier.padding(top = 4.dp)) {
+            sections.forEach { (type, sectionTasks) ->
+                if (showHeaders) {
+                    TaskSectionHeader(title = type.label)
                 }
+                TaskSection(
+                    groupId = group.id,
+                    type = type,
+                    tasks = sectionTasks,
+                    onToggleTask = onToggleTask,
+                    onRemoveTask = onRemoveTask,
+                    onMoveTask = onMoveTask,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskSectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 22.dp, top = 8.dp, bottom = 2.dp),
+    )
+}
+
+@Composable
+private fun TaskSection(
+    groupId: String,
+    type: TaskType,
+    tasks: List<Task>,
+    onToggleTask: (String) -> Unit,
+    onRemoveTask: (String) -> Unit,
+    onMoveTask: (String, TaskType, Int, Int) -> Unit,
+) {
+    ReorderableColumn(
+        list = tasks,
+        onSettle = { fromIndex, toIndex ->
+            onMoveTask(groupId, type, fromIndex, toIndex)
+        },
+    ) { _, task, _ ->
+        key(task.id) {
+            ReorderableItem {
+                TaskRow(
+                    task = task,
+                    onToggle = { onToggleTask(task.id) },
+                    onRemove = { onRemoveTask(task.id) },
+                    dragModifier = Modifier.draggableHandle(),
+                )
             }
         }
     }
@@ -842,6 +893,12 @@ private fun ResetHourSelector(
         }
     }
 }
+
+private val TaskType.label: String
+    get() = when (this) {
+        TaskType.DAILY -> "日課"
+        TaskType.WEEKLY -> "週課"
+    }
 
 // タスク行の固定高さ。変更時はコンテキストメニューのオフセット計算にも影響する
 private val TASK_ROW_HEIGHT = 40.dp

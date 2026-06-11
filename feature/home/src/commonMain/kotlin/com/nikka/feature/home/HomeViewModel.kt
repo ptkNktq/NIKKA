@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.nikka.core.data.TaskRepository
 import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
+import com.nikka.core.model.TaskType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +26,7 @@ data class HomeUiState(
     val isAddGroupDialogVisible: Boolean = false,
     val isAddTaskDialogVisible: Boolean = false,
     val addTaskTargetGroupId: String? = null,
+    val addTaskTargetType: TaskType = TaskType.DAILY,
     val deleteGroupConfirmId: String? = null,
     val resetHourTargetGroupId: String? = null,
     val isLoading: Boolean = true,
@@ -115,8 +117,13 @@ class HomeViewModel(
         val newGroups = groups.map { group ->
             if (group.id in resetGroupIds) group.copy(lastResetDate = today) else group
         }
+        // 日次の自動リセット対象は日課のみ。週課のリセットは週次ロジックで扱う
         val newTasks = tasks.map { task ->
-            if (task.groupId in resetGroupIds) task.copy(isCompleted = false) else task
+            if (task.groupId in resetGroupIds && task.type == TaskType.DAILY) {
+                task.copy(isCompleted = false)
+            } else {
+                task
+            }
         }
         return AutoResetResult(newGroups, newTasks, resetGroupIds)
     }
@@ -146,13 +153,14 @@ class HomeViewModel(
         persistAll()
     }
 
-    fun addTask(groupId: String, title: String) {
+    fun addTask(groupId: String, title: String, type: TaskType = TaskType.DAILY) {
         if (title.isBlank()) return
         _uiState.update { state ->
             val newTask = Task(
                 id = Uuid.random().toString(),
                 groupId = groupId,
                 title = title,
+                type = type,
             )
             state.copy(
                 tasks = state.tasks + newTask,
@@ -209,16 +217,19 @@ class HomeViewModel(
         persistAll()
     }
 
-    fun moveTask(groupId: String, fromIndex: Int, toIndex: Int) {
+    fun moveTask(groupId: String, type: TaskType, fromIndex: Int, toIndex: Int) {
         if (fromIndex == toIndex) return
         _uiState.update { state ->
-            val groupTasks = state.tasks.filter { it.groupId == groupId }.toMutableList()
-            if (fromIndex !in groupTasks.indices || toIndex !in groupTasks.indices) return@update state
-            groupTasks.add(toIndex, groupTasks.removeAt(fromIndex))
-            val reorderedQueue = ArrayDeque(groupTasks)
+            // 並べ替えは同一グループ・同一種別のセクション内で完結する
+            val sectionTasks = state.tasks
+                .filter { it.groupId == groupId && it.type == type }
+                .toMutableList()
+            if (fromIndex !in sectionTasks.indices || toIndex !in sectionTasks.indices) return@update state
+            sectionTasks.add(toIndex, sectionTasks.removeAt(fromIndex))
+            val reorderedQueue = ArrayDeque(sectionTasks)
             state.copy(
                 tasks = state.tasks.map {
-                    if (it.groupId == groupId) reorderedQueue.removeFirst() else it
+                    if (it.groupId == groupId && it.type == type) reorderedQueue.removeFirst() else it
                 },
             )
         }
@@ -256,8 +267,14 @@ class HomeViewModel(
         _uiState.update { it.copy(isAddGroupDialogVisible = false) }
     }
 
-    fun showAddTaskDialog(groupId: String) {
-        _uiState.update { it.copy(isAddTaskDialogVisible = true, addTaskTargetGroupId = groupId) }
+    fun showAddTaskDialog(groupId: String, type: TaskType = TaskType.DAILY) {
+        _uiState.update {
+            it.copy(
+                isAddTaskDialogVisible = true,
+                addTaskTargetGroupId = groupId,
+                addTaskTargetType = type,
+            )
+        }
     }
 
     fun showDeleteGroupConfirm(groupId: String) {

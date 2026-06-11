@@ -3,6 +3,7 @@ package com.nikka.feature.home
 import com.nikka.core.data.FakeTaskRepository
 import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
+import com.nikka.core.model.TaskType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -101,6 +102,21 @@ class HomeViewModelTest {
         assertEquals("デイリー任務", state.tasks.first().title)
         assertEquals(groupId, state.tasks.first().groupId)
         assertFalse(state.tasks.first().isCompleted)
+        assertEquals(TaskType.DAILY, state.tasks.first().type)
+    }
+
+    @Test
+    fun `addTask with WEEKLY type creates a weekly task`() = runTest {
+        viewModel.addGroup("原神")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val groupId = viewModel.uiState.value.groups.first().id
+
+        viewModel.addTask(groupId, "週ボス討伐", TaskType.WEEKLY)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val task = viewModel.uiState.value.tasks.first()
+        assertEquals("週ボス討伐", task.title)
+        assertEquals(TaskType.WEEKLY, task.type)
     }
 
     @Test
@@ -168,11 +184,20 @@ class HomeViewModelTest {
         val state = viewModel.uiState.value
         assertTrue(state.isAddTaskDialogVisible)
         assertEquals("group-1", state.addTaskTargetGroupId)
+        assertEquals(TaskType.DAILY, state.addTaskTargetType)
 
         viewModel.dismissAddTaskDialog()
         val dismissed = viewModel.uiState.value
         assertFalse(dismissed.isAddTaskDialogVisible)
         assertNull(dismissed.addTaskTargetGroupId)
+    }
+
+    @Test
+    fun `showAddTaskDialog with WEEKLY stores target type`() {
+        viewModel.showAddTaskDialog("group-1", TaskType.WEEKLY)
+        val state = viewModel.uiState.value
+        assertTrue(state.isAddTaskDialogVisible)
+        assertEquals(TaskType.WEEKLY, state.addTaskTargetType)
     }
 
     @Test
@@ -243,11 +268,33 @@ class HomeViewModelTest {
         viewModel.addTask(groupId, "タスク3")
         testDispatcher.scheduler.advanceUntilIdle()
 
-        viewModel.moveTask(groupId, 0, 2)
+        viewModel.moveTask(groupId, TaskType.DAILY, 0, 2)
         testDispatcher.scheduler.advanceUntilIdle()
 
         val titles = viewModel.uiState.value.tasks.map { it.title }
         assertEquals(listOf("タスク2", "タスク3", "タスク1"), titles)
+    }
+
+    @Test
+    fun `moveTask reorders only within the same type section`() = runTest {
+        viewModel.addGroup("原神")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val groupId = viewModel.uiState.value.groups.first().id
+        viewModel.addTask(groupId, "日課1")
+        viewModel.addTask(groupId, "週課1", TaskType.WEEKLY)
+        viewModel.addTask(groupId, "日課2")
+        viewModel.addTask(groupId, "週課2", TaskType.WEEKLY)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // 週課セクション内 (週課1, 週課2) の並べ替え。日課の順序には影響しない
+        viewModel.moveTask(groupId, TaskType.WEEKLY, 0, 1)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        val dailyTitles = state.tasks.filter { it.type == TaskType.DAILY }.map { it.title }
+        val weeklyTitles = state.tasks.filter { it.type == TaskType.WEEKLY }.map { it.title }
+        assertEquals(listOf("日課1", "日課2"), dailyTitles)
+        assertEquals(listOf("週課2", "週課1"), weeklyTitles)
     }
 
     @Test
@@ -258,7 +305,7 @@ class HomeViewModelTest {
         viewModel.addTask(groupId, "タスク1")
         testDispatcher.scheduler.advanceUntilIdle()
 
-        viewModel.moveTask(groupId, 0, 0)
+        viewModel.moveTask(groupId, TaskType.DAILY, 0, 0)
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals("タスク1", viewModel.uiState.value.tasks.first().title)
@@ -367,6 +414,25 @@ class HomeViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertFalse(vm.uiState.value.tasks.first().isCompleted)
+    }
+
+    @Test
+    fun `auto reset does not reset weekly tasks`() = runTest {
+        // 日次リセットの条件を満たしても、週課は未完了に戻さない
+        val clock = fixedClock("2026-04-05T10:00:00Z")
+        repository.saveAll(
+            groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
+            tasks = listOf(
+                Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true),
+                Task(id = "t2", groupId = "g1", title = "週ボス", isCompleted = true, type = TaskType.WEEKLY),
+            ),
+        )
+        val vm = HomeViewModel(repository, clock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val tasks = vm.uiState.value.tasks
+        assertFalse(tasks.first { it.id == "t1" }.isCompleted)
+        assertTrue(tasks.first { it.id == "t2" }.isCompleted)
     }
 
     @Test
