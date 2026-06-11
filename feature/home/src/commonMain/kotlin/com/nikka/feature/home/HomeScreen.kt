@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
@@ -65,6 +66,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -97,7 +100,7 @@ fun HomeScreen(
         IconButton(onClick = viewModel::refreshAutoReset) {
             Icon(
                 imageVector = Icons.Rounded.Sync,
-                contentDescription = "リセット時刻に達した日課をリセット",
+                contentDescription = "リセット時刻・曜日に達した日課・週課をリセット",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -116,6 +119,7 @@ fun HomeScreen(
             onSettleDrag = viewModel::settleDrag,
             onMoveTask = viewModel::moveTask,
             onSetResetHour = viewModel::showResetHourDialog,
+            onSetResetDayOfWeek = viewModel::showResetDayOfWeekDialog,
         )
         FloatingActionButton(
             onClick = { viewModel.showAddGroupDialog() },
@@ -147,6 +151,7 @@ private fun HomeContent(
     onSettleDrag: () -> Unit,
     onMoveTask: (String, TaskType, Int, Int) -> Unit,
     onSetResetHour: (String) -> Unit,
+    onSetResetDayOfWeek: (String) -> Unit,
 ) {
     if (uiState.groups.isEmpty()) {
         EmptyState()
@@ -169,14 +174,17 @@ private fun HomeContent(
                         group = group,
                         tasks = uiState.tasks.filter { it.groupId == group.id },
                         isCollapsed = group.id in uiState.collapsedGroupIds,
-                        onToggleCollapse = { onToggleGroupCollapse(group.id) },
-                        onToggleTask = onToggleTask,
-                        onAddTask = { type -> onShowAddTask(group.id, type) },
-                        onRemoveTask = onRemoveTask,
-                        onRemoveGroup = { onRemoveGroup(group.id) },
-                        onResetGroup = { onResetGroup(group.id) },
-                        onSetResetHour = { onSetResetHour(group.id) },
-                        onMoveTask = onMoveTask,
+                        actions = GroupCardActions(
+                            onToggleCollapse = { onToggleGroupCollapse(group.id) },
+                            onToggleTask = onToggleTask,
+                            onAddTask = { type -> onShowAddTask(group.id, type) },
+                            onRemoveTask = onRemoveTask,
+                            onRemoveGroup = { onRemoveGroup(group.id) },
+                            onResetGroup = { onResetGroup(group.id) },
+                            onSetResetHour = { onSetResetHour(group.id) },
+                            onSetResetDayOfWeek = { onSetResetDayOfWeek(group.id) },
+                            onMoveTask = onMoveTask,
+                        ),
                         dragModifier = Modifier.draggableHandle(
                             onDragStopped = { onSettleDrag() },
                         ),
@@ -216,25 +224,10 @@ private fun HomeDialogs(uiState: HomeUiState, viewModel: HomeViewModel) {
     if (uiState.deleteGroupConfirmId != null) {
         val groupName = uiState.groups
             .find { it.id == uiState.deleteGroupConfirmId }?.name ?: ""
-        AlertDialog(
-            onDismissRequest = viewModel::dismissDeleteGroupConfirm,
-            title = { Text("グループを削除") },
-            text = { Text("「$groupName」とその日課・週課をすべて削除しますか？") },
-            confirmButton = {
-                Button(
-                    onClick = viewModel::confirmDeleteGroup,
-                    colors = ButtonDefaults.buttonColors(containerColor = StatusRed),
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    Text("削除")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::dismissDeleteGroupConfirm) {
-                    Text("キャンセル")
-                }
-            },
-            shape = RoundedCornerShape(20.dp),
+        DeleteGroupConfirmDialog(
+            groupName = groupName,
+            onConfirm = viewModel::confirmDeleteGroup,
+            onDismiss = viewModel::dismissDeleteGroupConfirm,
         )
     }
     if (uiState.resetHourTargetGroupId != null) {
@@ -247,6 +240,44 @@ private fun HomeDialogs(uiState: HomeUiState, viewModel: HomeViewModel) {
             )
         }
     }
+    if (uiState.resetDayOfWeekTargetGroupId != null) {
+        val group = uiState.groups.find { it.id == uiState.resetDayOfWeekTargetGroupId }
+        if (group != null) {
+            ResetDayOfWeekDialog(
+                currentDay = group.resetDayOfWeek,
+                onConfirm = { day -> viewModel.setResetDayOfWeek(group.id, day) },
+                onDismiss = viewModel::dismissResetDayOfWeekDialog,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeleteGroupConfirmDialog(
+    groupName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("グループを削除") },
+        text = { Text("「$groupName」とその日課・週課をすべて削除しますか？") },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = StatusRed),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text("削除")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("キャンセル")
+            }
+        },
+        shape = RoundedCornerShape(20.dp),
+    )
 }
 
 @Composable
@@ -279,20 +310,26 @@ private fun EmptyState() {
     }
 }
 
+/** グループカード内の操作コールバック。対象グループへの紐付けは呼び出し側で済ませておく */
+private data class GroupCardActions(
+    val onToggleCollapse: () -> Unit,
+    val onToggleTask: (String) -> Unit,
+    val onAddTask: (TaskType) -> Unit,
+    val onRemoveTask: (String) -> Unit,
+    val onRemoveGroup: () -> Unit,
+    val onResetGroup: () -> Unit,
+    val onSetResetHour: () -> Unit,
+    val onSetResetDayOfWeek: () -> Unit,
+    val onMoveTask: (String, TaskType, Int, Int) -> Unit,
+)
+
 @Composable
 private fun GroupCard(
     modifier: Modifier = Modifier,
     group: TaskGroup,
     tasks: List<Task>,
     isCollapsed: Boolean,
-    onToggleCollapse: () -> Unit,
-    onToggleTask: (String) -> Unit,
-    onAddTask: (TaskType) -> Unit,
-    onRemoveTask: (String) -> Unit,
-    onRemoveGroup: () -> Unit,
-    onResetGroup: () -> Unit,
-    onSetResetHour: () -> Unit,
-    onMoveTask: (String, TaskType, Int, Int) -> Unit,
+    actions: GroupCardActions,
     dragModifier: Modifier = Modifier,
 ) {
     val allCompleted = tasks.isNotEmpty() && tasks.all { it.isCompleted }
@@ -309,20 +346,16 @@ private fun GroupCard(
             group = group,
             allCompleted = allCompleted,
             isCollapsed = isCollapsed,
-            onToggleCollapse = onToggleCollapse,
-            onAddTask = onAddTask,
-            onResetGroup = onResetGroup,
-            onRemoveGroup = onRemoveGroup,
-            onSetResetHour = onSetResetHour,
+            actions = actions,
             dragModifier = dragModifier,
         )
         if (!isCollapsed) {
             GroupCardBody(
                 group = group,
                 tasks = tasks,
-                onToggleTask = onToggleTask,
-                onRemoveTask = onRemoveTask,
-                onMoveTask = onMoveTask,
+                onToggleTask = actions.onToggleTask,
+                onRemoveTask = actions.onRemoveTask,
+                onMoveTask = actions.onMoveTask,
             )
         }
     }
@@ -334,11 +367,7 @@ private fun GroupCardHeader(
     group: TaskGroup,
     allCompleted: Boolean,
     isCollapsed: Boolean,
-    onToggleCollapse: () -> Unit,
-    onAddTask: (TaskType) -> Unit,
-    onResetGroup: () -> Unit,
-    onRemoveGroup: () -> Unit,
-    onSetResetHour: () -> Unit,
+    actions: GroupCardActions,
     dragModifier: Modifier = Modifier,
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
@@ -352,8 +381,8 @@ private fun GroupCardHeader(
             group = group,
             allCompleted = allCompleted,
             isCollapsed = isCollapsed,
-            onToggleCollapse = onToggleCollapse,
-            onResetGroup = onResetGroup,
+            onToggleCollapse = actions.onToggleCollapse,
+            onResetGroup = actions.onResetGroup,
             dragModifier = dragModifier,
             onPointerPositionChanged = { lastPointerPosition = it },
             onSecondaryClick = {
@@ -370,18 +399,23 @@ private fun GroupCardHeader(
             expanded = showContextMenu,
             offset = contextMenuOffset,
             resetHour = group.resetHour,
+            resetDayOfWeek = group.resetDayOfWeek,
             onDismiss = { showContextMenu = false },
             onAddTask = { type ->
                 showContextMenu = false
-                onAddTask(type)
+                actions.onAddTask(type)
             },
             onSetResetHour = {
                 showContextMenu = false
-                onSetResetHour()
+                actions.onSetResetHour()
+            },
+            onSetResetDayOfWeek = {
+                showContextMenu = false
+                actions.onSetResetDayOfWeek()
             },
             onRemove = {
                 showContextMenu = false
-                onRemoveGroup()
+                actions.onRemoveGroup()
             },
         )
     }
@@ -487,9 +521,11 @@ private fun GroupContextMenu(
     expanded: Boolean,
     offset: DpOffset = DpOffset.Zero,
     resetHour: Int?,
+    resetDayOfWeek: Int?,
     onDismiss: () -> Unit,
     onAddTask: (TaskType) -> Unit,
     onSetResetHour: () -> Unit,
+    onSetResetDayOfWeek: () -> Unit,
     onRemove: () -> Unit,
 ) {
     DropdownMenu(
@@ -499,55 +535,61 @@ private fun GroupContextMenu(
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
     ) {
-        AddTaskMenuItem(label = "日課を追加", onClick = { onAddTask(TaskType.DAILY) })
-        AddTaskMenuItem(label = "週課を追加", onClick = { onAddTask(TaskType.WEEKLY) })
-        DropdownMenuItem(
-            text = {
-                val label = if (resetHour != null) {
-                    "リセット時刻: $resetHour:00"
-                } else {
-                    "リセット時刻を設定"
-                }
-                Text(label)
-            },
-            onClick = onSetResetHour,
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Rounded.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            },
+        GroupMenuItem(
+            label = "日課を追加",
+            icon = Icons.Rounded.Add,
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = { onAddTask(TaskType.DAILY) },
         )
-        DropdownMenuItem(
-            text = {
-                Text("削除", color = StatusRed)
+        GroupMenuItem(
+            label = "週課を追加",
+            icon = Icons.Rounded.Add,
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = { onAddTask(TaskType.WEEKLY) },
+        )
+        GroupMenuItem(
+            label = if (resetHour != null) "日課リセット時刻: $resetHour:00" else "日課リセット時刻を設定",
+            icon = Icons.Rounded.Refresh,
+            iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+            onClick = onSetResetHour,
+        )
+        GroupMenuItem(
+            label = if (resetDayOfWeek != null) {
+                "週課リセット曜日: ${dayOfWeekLabel(resetDayOfWeek)}"
+            } else {
+                "週課リセット曜日を設定"
             },
+            icon = Icons.Rounded.DateRange,
+            iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+            onClick = onSetResetDayOfWeek,
+        )
+        GroupMenuItem(
+            label = "削除",
+            icon = Icons.Outlined.Delete,
+            iconTint = StatusRed,
+            labelColor = StatusRed,
             onClick = onRemove,
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Outlined.Delete,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = StatusRed,
-                )
-            },
         )
     }
 }
 
 @Composable
-private fun AddTaskMenuItem(label: String, onClick: () -> Unit) {
+private fun GroupMenuItem(
+    label: String,
+    icon: ImageVector,
+    iconTint: Color,
+    onClick: () -> Unit,
+    labelColor: Color = Color.Unspecified,
+) {
     DropdownMenuItem(
-        text = { Text(label) },
+        text = { Text(label, color = labelColor) },
         onClick = onClick,
         leadingIcon = {
             Icon(
-                imageVector = Icons.Rounded.Add,
+                imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.primary,
+                tint = iconTint,
             )
         },
     )
@@ -818,7 +860,7 @@ private fun ResetHourDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("自動リセット時刻") },
+        title = { Text("日課リセット時刻") },
         text = {
             ResetHourSelector(
                 selectedHour = selectedHour,
@@ -894,14 +936,109 @@ private fun ResetHourSelector(
     }
 }
 
+@Composable
+private fun ResetDayOfWeekDialog(
+    currentDay: Int?,
+    onConfirm: (Int?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selectedDay by remember { mutableStateOf(currentDay) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("週課リセット曜日") },
+        text = {
+            ResetDayOfWeekSelector(
+                selectedDay = selectedDay,
+                onDaySelected = { selectedDay = it },
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(selectedDay) },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text("設定")
+            }
+        },
+        dismissButton = {
+            if (currentDay != null) {
+                TextButton(onClick = { onConfirm(null) }) {
+                    Text("解除")
+                }
+            } else {
+                TextButton(onClick = onDismiss) {
+                    Text("キャンセル")
+                }
+            }
+        },
+        shape = RoundedCornerShape(20.dp),
+    )
+}
+
+@Composable
+private fun ResetDayOfWeekSelector(
+    selectedDay: Int?,
+    onDaySelected: (Int) -> Unit,
+) {
+    Column {
+        Text(
+            text = if (selectedDay != null) "${dayOfWeekLabel(selectedDay)}にリセット" else "曜日を選択",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(RESET_DAY_GRID_COLUMNS),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.height(RESET_DAY_GRID_HEIGHT),
+        ) {
+            items(DAYS_IN_WEEK) { index ->
+                val isoDay = index + 1
+                val isSelected = isoDay == selectedDay
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                        )
+                        .clickable { onDaySelected(isoDay) }
+                        .padding(vertical = 6.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = dayOfWeekLabel(isoDay),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
 private val TaskType.label: String
     get() = when (this) {
         TaskType.DAILY -> "日課"
         TaskType.WEEKLY -> "週課"
     }
 
+// ISO 8601 の曜日番号 (1=月曜) 順
+private val DAY_OF_WEEK_LABELS = listOf("月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜")
+
+private fun dayOfWeekLabel(isoDay: Int): String = DAY_OF_WEEK_LABELS[isoDay - 1]
+
 // タスク行の固定高さ。変更時はコンテキストメニューのオフセット計算にも影響する
 private val TASK_ROW_HEIGHT = 40.dp
 private const val HOURS_IN_DAY = 24
 private const val RESET_HOUR_GRID_COLUMNS = 4
 private val RESET_HOUR_GRID_HEIGHT = 240.dp
+private const val DAYS_IN_WEEK = 7
+private const val RESET_DAY_GRID_COLUMNS = 4
+private val RESET_DAY_GRID_HEIGHT = 80.dp
