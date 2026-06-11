@@ -66,6 +66,15 @@ class JsonTaskRepository(
         }
     }
 
+    override suspend fun loadLastWeeklyNotifiedDate(): LocalDate? = load().lastWeeklyNotifiedDate
+
+    override suspend fun saveLastWeeklyNotifiedDate(date: LocalDate) {
+        mutex.withLock {
+            val current = readFile()
+            writeFile(current.copy(lastWeeklyNotifiedDate = date))
+        }
+    }
+
     private suspend fun load(): NikkaData {
         mutex.withLock { return readFile() }
     }

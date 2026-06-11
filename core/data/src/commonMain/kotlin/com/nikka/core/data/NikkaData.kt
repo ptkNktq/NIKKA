@@ -12,4 +12,5 @@ data class NikkaData(
     val tasks: List<Task> = emptyList(),
     val notificationSettings: NotificationSettings = NotificationSettings(),
     val lastNotifiedDate: LocalDate? = null,
+    val lastWeeklyNotifiedDate: LocalDate? = null,
 )

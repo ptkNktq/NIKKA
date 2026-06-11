@@ -4,6 +4,8 @@ import com.nikka.core.model.NotificationSettings
 import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
 import com.nikka.core.model.TaskType
+import com.nikka.core.model.isDailyResetPending
+import com.nikka.core.model.pendingWeeklyResetDate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -20,6 +22,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
@@ -27,10 +30,12 @@ import java.util.logging.Level
 import java.util.logging.Logger
 
 /**
- * 指定時刻に日課の未達成を Discord Webhook で通知するスケジューラ。
+ * 指定時刻に日課・週課の未達成を Discord Webhook で通知するスケジューラ。
  *
  * - アプリ起動中のみ動作する。
- * - 1 日 1 回まで通知する (当日の通知済みフラグは Repository に永続化)。
+ * - 日課: 未達成があれば毎日通知する。
+ * - 週課: 翌日が週課リセット曜日のグループに未達成があれば、リセット前日の同時刻に通知する。
+ * - それぞれ 1 日 1 回まで通知する (当日の通知済みフラグは Repository に個別に永続化)。
  * - 未達成タスクが 0 件の場合は送信せず、通知済みフラグだけ立てる (当日再度増えても再送しない)。
  * - 当日の通知時刻を過ぎてから設定を ON にした場合、今日分が未送信なら即時送信する。
  *
@@ -108,10 +113,7 @@ class NotificationScheduler(
             val waitMs = computeWaitMillis(settings.hour)
             if (waitMs > 0) delay(waitMs)
             val fired = try {
-                fireIfNeeded(
-                    webhookUrl = settings.webhookUrl,
-                    message = settings.message ?: NotificationSettings.DEFAULT_MESSAGE,
-                )
+                fireIfNeeded(settings)
             } catch (e: Exception) {
                 // 通知失敗は次サイクルで再試行。原因切り分けのためログ出力のみ行う。
                 logger.log(Level.WARNING, "Failed to send scheduled notification", e)
@@ -122,6 +124,7 @@ class NotificationScheduler(
                 // これ以上連続失敗する URL なら当日は諦めて翌日の通知時刻を待つ
                 val today = clock.now().toLocalDateTime(timeZone).date
                 repository.saveLastNotifiedDate(today)
+                repository.saveLastWeeklyNotifiedDate(today)
                 failureCount = 0
             }
             delay(failureBackoffMs(failureCount))
@@ -135,20 +138,38 @@ class NotificationScheduler(
         val todayTarget = LocalDateTime(now.date, LocalTime(safeHour, 0)).toInstant(timeZone)
         val target = when {
             todayTarget > nowInstant -> todayTarget
-            // 当日 hour:00 を過ぎていて未送信なら即時発火 (hour 超え後に ON にしたケース)
-            repository.loadLastNotifiedDate() != now.date -> nowInstant
+            // 当日 hour:00 を過ぎていて日課・週課いずれかが未送信なら即時発火 (hour 超え後に ON にしたケース)
+            repository.loadLastNotifiedDate() != now.date ||
+                repository.loadLastWeeklyNotifiedDate() != now.date -> nowInstant
             else -> LocalDateTime(now.date.plus(1, DateTimeUnit.DAY), LocalTime(safeHour, 0))
                 .toInstant(timeZone)
         }
         return (target - nowInstant).inWholeMilliseconds.coerceAtLeast(0)
     }
 
-    private suspend fun fireIfNeeded(webhookUrl: String, message: String): Boolean {
+    private suspend fun fireIfNeeded(settings: NotificationSettings): Boolean {
         val now = clock.now().toLocalDateTime(timeZone)
-        val today = now.date
+        // 片方が失敗してももう片方は送信を試み、未完了の方だけ次サイクルで再試行する
+        val dailySent = fireDailyIfNeeded(settings, now.hour, now.date)
+        val weeklySent = fireWeeklyIfNeeded(settings, now.hour, now.date)
+        return dailySent && weeklySent
+    }
+
+    private suspend fun fireDailyIfNeeded(
+        settings: NotificationSettings,
+        currentHour: Int,
+        today: LocalDate,
+    ): Boolean {
         if (repository.loadLastNotifiedDate() == today) return true
-        val sent = if (hasUncompletedTasks(now.hour, today)) {
-            webhookClient.send(webhookUrl, message).isSuccess
+        val hasTarget = hasUncompletedDailyTasks(
+            groups = repository.loadGroups(),
+            tasks = repository.loadTasks(),
+            currentHour = currentHour,
+            today = today,
+        )
+        val sent = if (hasTarget) {
+            val message = settings.message ?: NotificationSettings.DEFAULT_MESSAGE
+            webhookClient.send(settings.webhookUrl, message).isSuccess
         } else {
             // 未達成 0 件の日は送らない。当日再度増えても再通知しない仕様なのでフラグだけ立てる
             true
@@ -157,13 +178,28 @@ class NotificationScheduler(
         return sent
     }
 
-    private suspend fun hasUncompletedTasks(currentHour: Int, today: LocalDate): Boolean =
-        hasUncompletedDailyTasks(
+    private suspend fun fireWeeklyIfNeeded(
+        settings: NotificationSettings,
+        currentHour: Int,
+        today: LocalDate,
+    ): Boolean {
+        if (repository.loadLastWeeklyNotifiedDate() == today) return true
+        val hasTarget = hasUncompletedWeeklyTasks(
             groups = repository.loadGroups(),
             tasks = repository.loadTasks(),
             currentHour = currentHour,
             today = today,
         )
+        val sent = if (hasTarget) {
+            val message = settings.weeklyMessage ?: NotificationSettings.DEFAULT_WEEKLY_MESSAGE
+            webhookClient.send(settings.webhookUrl, message).isSuccess
+        } else {
+            // 通知対象 0 件の日は送らない。フラグだけ立てて当日の再評価を抑止する
+            true
+        }
+        if (sent) repository.saveLastWeeklyNotifiedDate(today)
+        return sent
+    }
 
     // failureCount は「直前の送信が失敗していた回数」。0 = 直前成功 (初回発火含む)
     private fun failureBackoffMs(failureCount: Int): Long = when (failureCount) {
@@ -188,7 +224,7 @@ class NotificationScheduler(
 }
 
 /**
- * リマインダー対象 (日課) に未達成があるかを判定する。週課は未完了でも通知の対象外。
+ * 日課リマインダー対象に未達成があるかを判定する。週課は対象外。
  *
  * HomeViewModel が動いていない間に resetHour が到達した場合、[Task.isCompleted]
  * は前日のまま = true のことがある。そのようなグループの日課は「未完了扱い」で判定する。
@@ -199,11 +235,33 @@ internal fun hasUncompletedDailyTasks(
     currentHour: Int,
     today: LocalDate,
 ): Boolean {
-    val pendingResetGroupIds = groups.filter { group ->
-        val hour = group.resetHour ?: return@filter false
-        currentHour >= hour && group.lastResetDate != today
-    }.map { it.id }.toSet()
+    val pendingResetGroupIds = groups
+        .filter { it.isDailyResetPending(today, currentHour) }
+        .map { it.id }
+        .toSet()
     return tasks.any { task ->
         task.type == TaskType.DAILY && (!task.isCompleted || task.groupId in pendingResetGroupIds)
+    }
+}
+
+/**
+ * 週課リマインダー対象に未達成があるかを判定する。
+ * 対象は「翌日が週課リセット曜日」のグループの週課のみ (リセットで消える前日に知らせる)。
+ * 週次リセットが未実施のグループは完了フラグが前週のままの可能性があるため「未完了扱い」で判定する。
+ */
+internal fun hasUncompletedWeeklyTasks(
+    groups: List<TaskGroup>,
+    tasks: List<Task>,
+    currentHour: Int,
+    today: LocalDate,
+): Boolean {
+    val tomorrowIsoDay = today.plus(1, DateTimeUnit.DAY).dayOfWeek.isoDayNumber
+    return groups.filter { it.resetDayOfWeek == tomorrowIsoDay }.any { group ->
+        val pendingReset = group.pendingWeeklyResetDate(today, currentHour) != null
+        tasks.any { task ->
+            task.groupId == group.id &&
+                task.type == TaskType.WEEKLY &&
+                (!task.isCompleted || pendingReset)
+        }
     }
 }

@@ -17,4 +17,7 @@ interface TaskRepository {
 
     suspend fun loadLastNotifiedDate(): LocalDate?
     suspend fun saveLastNotifiedDate(date: LocalDate)
+
+    suspend fun loadLastWeeklyNotifiedDate(): LocalDate?
+    suspend fun saveLastWeeklyNotifiedDate(date: LocalDate)
 }

@@ -8,9 +8,11 @@ data class NotificationSettings(
     val webhookUrl: String = "",
     val message: String? = null,
     val hour: Int = DEFAULT_HOUR,
+    val weeklyMessage: String? = null,
 ) {
     companion object {
         const val DEFAULT_HOUR = 21
         const val DEFAULT_MESSAGE = "本日の日課に未達成の項目があります。"
+        const val DEFAULT_WEEKLY_MESSAGE = "明日リセットされる週課に未達成の項目があります。"
     }
 }
