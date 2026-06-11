@@ -56,6 +56,9 @@ class NotificationSettingsViewModel(
     fun setMessage(message: String) =
         updateAndPersist { it.copy(message = message.ifBlank { null }) }
 
+    fun setWeeklyMessage(message: String) =
+        updateAndPersist { it.copy(weeklyMessage = message.ifBlank { null }) }
+
     fun setHour(hour: Int) = updateAndPersist { it.copy(hour = hour) }
 
     fun showHourDialog() {
