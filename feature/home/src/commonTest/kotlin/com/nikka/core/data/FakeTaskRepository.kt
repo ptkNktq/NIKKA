@@ -1,6 +1,6 @@
 package com.nikka.core.data
 
-import com.nikka.core.model.DailyTask
+import com.nikka.core.model.Task
 import com.nikka.core.model.NotificationSettings
 import com.nikka.core.model.TaskGroup
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,15 +10,15 @@ import kotlinx.datetime.LocalDate
 
 class FakeTaskRepository : TaskRepository {
     private var groups = mutableListOf<TaskGroup>()
-    private var tasks = mutableListOf<DailyTask>()
+    private var tasks = mutableListOf<Task>()
     private var lastNotifiedDate: LocalDate? = null
 
     private val _notificationSettings = MutableStateFlow(NotificationSettings())
     override val notificationSettings: StateFlow<NotificationSettings> = _notificationSettings.asStateFlow()
 
     override suspend fun loadGroups(): List<TaskGroup> = groups.toList()
-    override suspend fun loadTasks(): List<DailyTask> = tasks.toList()
-    override suspend fun saveAll(groups: List<TaskGroup>, tasks: List<DailyTask>) {
+    override suspend fun loadTasks(): List<Task> = tasks.toList()
+    override suspend fun saveAll(groups: List<TaskGroup>, tasks: List<Task>) {
         this.groups = groups.toMutableList()
         this.tasks = tasks.toMutableList()
     }

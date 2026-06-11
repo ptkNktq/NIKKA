@@ -3,7 +3,7 @@ package com.nikka.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nikka.core.data.TaskRepository
-import com.nikka.core.model.DailyTask
+import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +20,7 @@ import kotlin.uuid.Uuid
 
 data class HomeUiState(
     val groups: List<TaskGroup> = emptyList(),
-    val tasks: List<DailyTask> = emptyList(),
+    val tasks: List<Task> = emptyList(),
     val collapsedGroupIds: Set<String> = emptySet(),
     val isAddGroupDialogVisible: Boolean = false,
     val isAddTaskDialogVisible: Boolean = false,
@@ -49,7 +49,7 @@ class HomeViewModel(
 
     private data class AutoResetResult(
         val groups: List<TaskGroup>,
-        val tasks: List<DailyTask>,
+        val tasks: List<Task>,
         val resetGroupIds: Set<String>,
     )
 
@@ -102,7 +102,7 @@ class HomeViewModel(
 
     private fun applyAutoReset(
         groups: List<TaskGroup>,
-        tasks: List<DailyTask>,
+        tasks: List<Task>,
     ): AutoResetResult {
         val now = clock.now().toLocalDateTime(timeZone)
         val today = now.date
@@ -149,7 +149,7 @@ class HomeViewModel(
     fun addTask(groupId: String, title: String) {
         if (title.isBlank()) return
         _uiState.update { state ->
-            val newTask = DailyTask(
+            val newTask = Task(
                 id = Uuid.random().toString(),
                 groupId = groupId,
                 title = title,

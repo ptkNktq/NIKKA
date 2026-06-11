@@ -1,6 +1,6 @@
 package com.nikka.core.data
 
-import com.nikka.core.model.DailyTask
+import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
@@ -31,7 +31,7 @@ class JsonTaskRepositoryTest {
     @Test
     fun `saveAll and load round-trips data`() = runTest {
         val groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5))
-        val tasks = listOf(DailyTask(id = "t1", groupId = "g1", title = "デイリー"))
+        val tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー"))
 
         repository.saveAll(groups, tasks)
 
@@ -43,11 +43,11 @@ class JsonTaskRepositoryTest {
     fun `saveAll overwrites previous data`() = runTest {
         repository.saveAll(
             listOf(TaskGroup(id = "g1", name = "原神")),
-            listOf(DailyTask(id = "t1", groupId = "g1", title = "タスク1")),
+            listOf(Task(id = "t1", groupId = "g1", title = "タスク1")),
         )
         repository.saveAll(
             listOf(TaskGroup(id = "g2", name = "スターレイル")),
-            listOf(DailyTask(id = "t2", groupId = "g2", title = "タスク2")),
+            listOf(Task(id = "t2", groupId = "g2", title = "タスク2")),
         )
 
         val groups = repository.loadGroups()

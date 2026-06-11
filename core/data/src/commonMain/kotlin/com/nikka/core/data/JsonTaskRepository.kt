@@ -1,7 +1,7 @@
 package com.nikka.core.data
 
-import com.nikka.core.model.DailyTask
 import com.nikka.core.model.NotificationSettings
+import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,9 +39,9 @@ class JsonTaskRepository(
 
     override suspend fun loadGroups(): List<TaskGroup> = load().groups
 
-    override suspend fun loadTasks(): List<DailyTask> = load().tasks
+    override suspend fun loadTasks(): List<Task> = load().tasks
 
-    override suspend fun saveAll(groups: List<TaskGroup>, tasks: List<DailyTask>) {
+    override suspend fun saveAll(groups: List<TaskGroup>, tasks: List<Task>) {
         mutex.withLock {
             val current = readFile()
             writeFile(current.copy(groups = groups, tasks = tasks))
@@ -95,7 +95,7 @@ class JsonTaskRepository(
                 )
             } ?: emptyList()
             val tasks = root["tasks"]?.jsonArray?.map { elem ->
-                json.decodeFromJsonElement(DailyTask.serializer(), elem)
+                json.decodeFromJsonElement(Task.serializer(), elem)
             } ?: emptyList()
             NikkaData(groups = groups, tasks = tasks)
         } catch (_: Exception) {

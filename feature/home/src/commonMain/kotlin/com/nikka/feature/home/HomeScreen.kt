@@ -76,7 +76,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import com.nikka.core.model.DailyTask
+import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
 import com.nikka.core.ui.component.ProvideTopBarActions
 import com.nikka.core.ui.theme.StatusGreen
@@ -278,7 +278,7 @@ private fun EmptyState() {
 private fun GroupCard(
     modifier: Modifier = Modifier,
     group: TaskGroup,
-    tasks: List<DailyTask>,
+    tasks: List<Task>,
     isCollapsed: Boolean,
     onToggleCollapse: () -> Unit,
     onToggleTask: (String) -> Unit,
@@ -545,7 +545,7 @@ private fun GroupContextMenu(
 @Composable
 private fun GroupCardBody(
     group: TaskGroup,
-    tasks: List<DailyTask>,
+    tasks: List<Task>,
     onToggleTask: (String) -> Unit,
     onRemoveTask: (String) -> Unit,
     onMoveTask: (String, Int, Int) -> Unit,
@@ -582,7 +582,7 @@ private fun GroupCardBody(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TaskRow(
-    task: DailyTask,
+    task: Task,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     dragModifier: Modifier = Modifier,
@@ -644,7 +644,7 @@ private fun TaskRow(
 }
 
 @Composable
-private fun RowScope.TaskRowContent(task: DailyTask, onToggle: () -> Unit) {
+private fun RowScope.TaskRowContent(task: Task, onToggle: () -> Unit) {
     Checkbox(
         checked = task.isCompleted,
         onCheckedChange = { onToggle() },

@@ -1,7 +1,7 @@
 package com.nikka.feature.home
 
 import com.nikka.core.data.FakeTaskRepository
-import com.nikka.core.model.DailyTask
+import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -361,7 +361,7 @@ class HomeViewModelTest {
         val clock = fixedClock("2026-04-05T10:00:00Z")
         repository.saveAll(
             groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
-            tasks = listOf(DailyTask(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
+            tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
         )
         val vm = HomeViewModel(repository, clock, utc)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -375,7 +375,7 @@ class HomeViewModelTest {
         val clock = fixedClock("2026-04-05T02:00:00Z")
         repository.saveAll(
             groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
-            tasks = listOf(DailyTask(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
+            tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
         )
         val vm = HomeViewModel(repository, clock, utc)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -390,7 +390,7 @@ class HomeViewModelTest {
         val clock = fixedClock("2026-04-05T10:00:00Z")
         repository.saveAll(
             groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5, lastResetDate = today)),
-            tasks = listOf(DailyTask(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
+            tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
         )
         val vm = HomeViewModel(repository, clock, utc)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -405,7 +405,7 @@ class HomeViewModelTest {
         val clock = fixedClock("2026-04-05T03:00:00Z")
         repository.saveAll(
             groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5, lastResetDate = yesterday)),
-            tasks = listOf(DailyTask(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
+            tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
         )
         val vm = HomeViewModel(repository, clock, utc)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -424,7 +424,7 @@ class HomeViewModelTest {
         }
         repository.saveAll(
             groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
-            tasks = listOf(DailyTask(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
+            tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
         )
         val vm = HomeViewModel(repository, mutableClock, utc)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -444,7 +444,7 @@ class HomeViewModelTest {
         val clock = fixedClock("2026-04-05T02:00:00Z")
         repository.saveAll(
             groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
-            tasks = listOf(DailyTask(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
+            tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
         )
         val vm = HomeViewModel(repository, clock, utc)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -465,7 +465,7 @@ class HomeViewModelTest {
         }
         repository.saveAll(
             groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
-            tasks = listOf(DailyTask(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
+            tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
         )
         val vm = HomeViewModel(repository, mutableClock, utc)
         testDispatcher.scheduler.advanceUntilIdle()

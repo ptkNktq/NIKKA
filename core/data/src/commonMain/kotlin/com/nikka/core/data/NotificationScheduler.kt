@@ -155,7 +155,7 @@ class NotificationScheduler(
     }
 
     /**
-     * HomeViewModel が動いていない間に resetHour が到達した場合、[com.nikka.core.model.DailyTask.isCompleted]
+     * HomeViewModel が動いていない間に resetHour が到達した場合、[com.nikka.core.model.Task.isCompleted]
      * は前日のまま = true のことがある。そのようなグループのタスクは「未完了扱い」で判定する。
      */
     private suspend fun hasUncompletedTasks(currentHour: Int, today: LocalDate): Boolean {
