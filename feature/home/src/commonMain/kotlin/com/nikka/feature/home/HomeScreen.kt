@@ -548,7 +548,7 @@ private fun GroupContextMenu(
             onClick = { onAddTask(TaskType.WEEKLY) },
         )
         GroupMenuItem(
-            label = if (resetHour != null) "日課リセット時刻: $resetHour:00" else "日課リセット時刻を設定",
+            label = if (resetHour != null) "日課リセット時刻: $resetHour:00" else "日課リセット時刻: 未設定",
             icon = Icons.Rounded.Refresh,
             iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
             onClick = onSetResetHour,
@@ -557,7 +557,7 @@ private fun GroupContextMenu(
             label = if (resetDayOfWeek != null) {
                 "週課リセット曜日: ${dayOfWeekLabel(resetDayOfWeek)}"
             } else {
-                "週課リセット曜日を設定"
+                "週課リセット曜日: 未設定"
             },
             icon = Icons.Rounded.DateRange,
             iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
