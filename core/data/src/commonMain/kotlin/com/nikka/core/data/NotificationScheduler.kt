@@ -1,6 +1,9 @@
 package com.nikka.core.data
 
 import com.nikka.core.model.NotificationSettings
+import com.nikka.core.model.Task
+import com.nikka.core.model.TaskGroup
+import com.nikka.core.model.TaskType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -154,19 +157,13 @@ class NotificationScheduler(
         return sent
     }
 
-    /**
-     * HomeViewModel が動いていない間に resetHour が到達した場合、[com.nikka.core.model.Task.isCompleted]
-     * は前日のまま = true のことがある。そのようなグループのタスクは「未完了扱い」で判定する。
-     */
-    private suspend fun hasUncompletedTasks(currentHour: Int, today: LocalDate): Boolean {
-        val groups = repository.loadGroups()
-        val tasks = repository.loadTasks()
-        val pendingResetGroupIds = groups.filter { group ->
-            val hour = group.resetHour ?: return@filter false
-            currentHour >= hour && group.lastResetDate != today
-        }.map { it.id }.toSet()
-        return tasks.any { task -> !task.isCompleted || task.groupId in pendingResetGroupIds }
-    }
+    private suspend fun hasUncompletedTasks(currentHour: Int, today: LocalDate): Boolean =
+        hasUncompletedDailyTasks(
+            groups = repository.loadGroups(),
+            tasks = repository.loadTasks(),
+            currentHour = currentHour,
+            today = today,
+        )
 
     // failureCount は「直前の送信が失敗していた回数」。0 = 直前成功 (初回発火含む)
     private fun failureBackoffMs(failureCount: Int): Long = when (failureCount) {
@@ -187,5 +184,26 @@ class NotificationScheduler(
 
         // 失敗 1→2→3→4 の累計で 5+15+15+15=50 分粘ってから当日を諦めて翌日の通知時刻を待つ
         private const val MAX_FAILURE_RETRIES = 4
+    }
+}
+
+/**
+ * リマインダー対象 (日課) に未達成があるかを判定する。週課は未完了でも通知の対象外。
+ *
+ * HomeViewModel が動いていない間に resetHour が到達した場合、[Task.isCompleted]
+ * は前日のまま = true のことがある。そのようなグループの日課は「未完了扱い」で判定する。
+ */
+internal fun hasUncompletedDailyTasks(
+    groups: List<TaskGroup>,
+    tasks: List<Task>,
+    currentHour: Int,
+    today: LocalDate,
+): Boolean {
+    val pendingResetGroupIds = groups.filter { group ->
+        val hour = group.resetHour ?: return@filter false
+        currentHour >= hour && group.lastResetDate != today
+    }.map { it.id }.toSet()
+    return tasks.any { task ->
+        task.type == TaskType.DAILY && (!task.isCompleted || task.groupId in pendingResetGroupIds)
     }
 }
