@@ -82,6 +82,18 @@ gradlew.bat detekt                    # Windows
 gradlew.bat detekt --auto-correct     # Windows
 ```
 
+## 配布用パッケージング
+
+インストール不要のポータブル版を生成する。jpackage はクロスビルドできないため、WSL ではなく Windows 側で実行すること。
+
+```powershell
+gradlew.bat createDistributable
+```
+
+出力先: `composeApp\build\compose\binaries\main\app\NIKKA\NIKKA.exe`
+
+`NIKKA` フォルダに実行に必要なランタイム一式が含まれるため、フォルダごとコピーして配布する。
+
 ## クレジット
 
 | 対象 | 制作者 |
