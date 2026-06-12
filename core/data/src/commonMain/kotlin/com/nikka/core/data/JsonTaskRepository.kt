@@ -99,7 +99,8 @@ class JsonTaskRepository(
                 TaskGroup(
                     id = obj["id"]!!.jsonPrimitive.content,
                     name = obj["name"]!!.jsonPrimitive.content,
-                    resetHour = obj["resetHour"]?.jsonPrimitive?.content?.toIntOrNull(),
+                    resetHour = obj["resetHour"]?.jsonPrimitive?.content?.toIntOrNull()
+                        ?: TaskGroup.DEFAULT_RESET_HOUR,
                     lastResetDate = lastResetStr?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
                 )
             } ?: emptyList()

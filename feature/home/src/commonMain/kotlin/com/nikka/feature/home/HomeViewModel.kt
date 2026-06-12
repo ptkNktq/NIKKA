@@ -7,6 +7,7 @@ import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
 import com.nikka.core.model.TaskType
 import com.nikka.core.model.isDailyResetPending
+import com.nikka.core.model.latestDailyResetDate
 import com.nikka.core.model.latestWeeklyResetDate
 import com.nikka.core.model.pendingWeeklyResetDate
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -142,10 +143,16 @@ class HomeViewModel(
 
     fun addGroup(name: String) {
         if (name.isBlank()) return
+        val now = clock.now().toLocalDateTime(timeZone)
         _uiState.update { state ->
-            val newGroup = TaskGroup(
+            // 作成時点までのリセット予定は実施済み扱いにして、直後の自動リセットを防ぐ
+            val base = TaskGroup(
                 id = Uuid.random().toString(),
                 name = name,
+            )
+            val newGroup = base.copy(
+                lastResetDate = base.latestDailyResetDate(now.date, now.hour),
+                lastWeeklyResetDate = base.latestWeeklyResetDate(now.date, now.hour),
             )
             state.copy(
                 groups = state.groups + newGroup,
@@ -315,11 +322,20 @@ class HomeViewModel(
         _uiState.update { it.copy(resetHourTargetGroupId = null) }
     }
 
-    fun setResetHour(groupId: String, hour: Int?) {
+    fun setResetHour(groupId: String, hour: Int) {
+        val now = clock.now().toLocalDateTime(timeZone)
         _uiState.update { state ->
             state.copy(
                 groups = state.groups.map { group ->
-                    if (group.id == groupId) group.copy(resetHour = hour) else group
+                    if (group.id != groupId) {
+                        group
+                    } else {
+                        // 変更時点までのリセット予定は実施済み扱いにして、当日の進捗を消さない
+                        val configured = group.copy(resetHour = hour)
+                        configured.copy(
+                            lastResetDate = configured.latestDailyResetDate(now.date, now.hour),
+                        )
+                    }
                 },
                 resetHourTargetGroupId = null,
             )
@@ -335,24 +351,19 @@ class HomeViewModel(
         _uiState.update { it.copy(resetDayOfWeekTargetGroupId = null) }
     }
 
-    fun setResetDayOfWeek(groupId: String, isoDayOfWeek: Int?) {
+    fun setResetDayOfWeek(groupId: String, isoDayOfWeek: Int) {
         val now = clock.now().toLocalDateTime(timeZone)
         _uiState.update { state ->
             state.copy(
                 groups = state.groups.map { group ->
-                    when {
-                        group.id != groupId -> group
-                        isoDayOfWeek == null -> group.copy(
-                            resetDayOfWeek = null,
-                            lastWeeklyResetDate = null,
+                    if (group.id != groupId) {
+                        group
+                    } else {
+                        // 設定時点の週課の進捗を消さないよう、直近のリセット予定日を実施済み扱いにする
+                        val configured = group.copy(resetDayOfWeek = isoDayOfWeek)
+                        configured.copy(
+                            lastWeeklyResetDate = configured.latestWeeklyResetDate(now.date, now.hour),
                         )
-                        else -> {
-                            // 設定時点の週課の進捗を消さないよう、直近のリセット予定日を実施済み扱いにする
-                            val configured = group.copy(resetDayOfWeek = isoDayOfWeek)
-                            configured.copy(
-                                lastWeeklyResetDate = configured.latestWeeklyResetDate(now.date, now.hour),
-                            )
-                        }
                     }
                 },
                 resetDayOfWeekTargetGroupId = null,

@@ -520,8 +520,8 @@ private fun GroupCardTitle(
 private fun GroupContextMenu(
     expanded: Boolean,
     offset: DpOffset = DpOffset.Zero,
-    resetHour: Int?,
-    resetDayOfWeek: Int?,
+    resetHour: Int,
+    resetDayOfWeek: Int,
     onDismiss: () -> Unit,
     onAddTask: (TaskType) -> Unit,
     onSetResetHour: () -> Unit,
@@ -548,17 +548,13 @@ private fun GroupContextMenu(
             onClick = { onAddTask(TaskType.WEEKLY) },
         )
         GroupMenuItem(
-            label = if (resetHour != null) "日課リセット時刻: $resetHour:00" else "日課リセット時刻: 未設定",
+            label = "日課リセット時刻: $resetHour:00",
             icon = Icons.Rounded.Refresh,
             iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
             onClick = onSetResetHour,
         )
         GroupMenuItem(
-            label = if (resetDayOfWeek != null) {
-                "週課リセット曜日: ${dayOfWeekLabel(resetDayOfWeek)}"
-            } else {
-                "週課リセット曜日: 未設定"
-            },
+            label = "週課リセット曜日: ${dayOfWeekLabel(resetDayOfWeek)}",
             icon = Icons.Rounded.DateRange,
             iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
             onClick = onSetResetDayOfWeek,
@@ -852,8 +848,8 @@ private fun InputDialog(
 
 @Composable
 private fun ResetHourDialog(
-    currentHour: Int?,
-    onConfirm: (Int?) -> Unit,
+    currentHour: Int,
+    onConfirm: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var selectedHour by remember { mutableStateOf(currentHour) }
@@ -877,14 +873,8 @@ private fun ResetHourDialog(
             }
         },
         dismissButton = {
-            if (currentHour != null) {
-                TextButton(onClick = { onConfirm(null) }) {
-                    Text("解除")
-                }
-            } else {
-                TextButton(onClick = onDismiss) {
-                    Text("キャンセル")
-                }
+            TextButton(onClick = onDismiss) {
+                Text("キャンセル")
             }
         },
         shape = RoundedCornerShape(20.dp),
@@ -893,12 +883,12 @@ private fun ResetHourDialog(
 
 @Composable
 private fun ResetHourSelector(
-    selectedHour: Int?,
+    selectedHour: Int,
     onHourSelected: (Int) -> Unit,
 ) {
     Column {
         Text(
-            text = if (selectedHour != null) "$selectedHour:00 にリセット" else "時刻を選択",
+            text = "$selectedHour:00 にリセット",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp),
@@ -938,8 +928,8 @@ private fun ResetHourSelector(
 
 @Composable
 private fun ResetDayOfWeekDialog(
-    currentDay: Int?,
-    onConfirm: (Int?) -> Unit,
+    currentDay: Int,
+    onConfirm: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var selectedDay by remember { mutableStateOf(currentDay) }
@@ -963,14 +953,8 @@ private fun ResetDayOfWeekDialog(
             }
         },
         dismissButton = {
-            if (currentDay != null) {
-                TextButton(onClick = { onConfirm(null) }) {
-                    Text("解除")
-                }
-            } else {
-                TextButton(onClick = onDismiss) {
-                    Text("キャンセル")
-                }
+            TextButton(onClick = onDismiss) {
+                Text("キャンセル")
             }
         },
         shape = RoundedCornerShape(20.dp),
@@ -979,12 +963,12 @@ private fun ResetDayOfWeekDialog(
 
 @Composable
 private fun ResetDayOfWeekSelector(
-    selectedDay: Int?,
+    selectedDay: Int,
     onDaySelected: (Int) -> Unit,
 ) {
     Column {
         Text(
-            text = if (selectedDay != null) "${dayOfWeekLabel(selectedDay)}にリセット" else "曜日を選択",
+            text = "${dayOfWeekLabel(selectedDay)}にリセット",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp),

@@ -74,18 +74,6 @@ class HasUncompletedWeeklyTasksTest {
     }
 
     @Test
-    fun `group without reset day never triggers`() {
-        val noDayGroup = group.copy(resetDayOfWeek = null, lastWeeklyResetDate = null)
-        val result = hasUncompletedWeeklyTasks(
-            groups = listOf(noDayGroup),
-            tasks = listOf(task("weekly", isCompleted = false)),
-            currentHour = 21,
-            today = sunday,
-        )
-        assertFalse(result)
-    }
-
-    @Test
     fun `completed weekly task in pending-reset group is treated as uncompleted`() {
         // 直近のリセット予定日 (3/30) が未実施 → 完了フラグは前週のものなので信用しない
         val pendingGroup = group.copy(lastWeeklyResetDate = LocalDate(2026, 3, 23))
