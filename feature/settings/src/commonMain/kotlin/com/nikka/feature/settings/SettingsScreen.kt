@@ -53,7 +53,7 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(vertical = 8.dp),
     ) {
-        SectionDivider(title = "表示")
+        SectionDivider(title = "表示", showDivider = false)
         SettingsToggleItem(
             icon = Icons.Rounded.UnfoldLess,
             title = "日課完了でグループを折りたたむ",
@@ -105,12 +105,15 @@ private fun notificationSubtitle(settings: NotificationSettings): String =
     if (settings.enabled) "ON / ${settings.hour}:00" else "OFF"
 
 @Composable
-private fun SectionDivider(title: String) {
+private fun SectionDivider(title: String, showDivider: Boolean = true) {
     Column {
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
+        // 先頭セクションは区切り線を出さない
+        if (showDivider) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+        }
         Text(
             text = title,
             style = MaterialTheme.typography.labelMedium,
