@@ -8,6 +8,7 @@ import com.nikka.core.model.TaskGroup
 import com.nikka.core.model.TaskType
 import com.nikka.core.model.allTasksCompleted
 import com.nikka.core.model.isDailyResetPending
+import com.nikka.core.model.latestDailyResetDate
 import com.nikka.core.model.pendingWeeklyResetDate
 import com.nikka.core.model.withDailyResetBaseline
 import com.nikka.core.model.withWeeklyResetBaseline
@@ -81,7 +82,10 @@ class HomeViewModel(
     private data class AutoResetResult(
         val groups: List<TaskGroup>,
         val tasks: List<Task>,
+        /** タスクが実際に未完了へ戻ったグループ (折りたたみ解除の対象) */
         val resetGroupIds: Set<String>,
+        /** グループのリセット実施日かタスクに変化があったか (永続化要否) */
+        val hasChanges: Boolean,
     )
 
     private fun loadData() {
@@ -109,7 +113,7 @@ class HomeViewModel(
                 isLoading = false,
             )
         }
-        if (result.resetGroupIds.isNotEmpty()) persistAll()
+        if (result.hasChanges) persistAll()
     }
 
     fun refreshAutoReset() {
@@ -118,7 +122,7 @@ class HomeViewModel(
                 val state = _uiState.value
                 if (state.isLoading) return@withLock
                 val result = applyAutoReset(state.groups, state.tasks)
-                if (result.resetGroupIds.isEmpty()) return@withLock
+                if (!result.hasChanges) return@withLock
                 _uiState.update {
                     it.copy(
                         groups = result.groups,
@@ -148,22 +152,32 @@ class HomeViewModel(
             group.pendingWeeklyResetDate(today, currentHour)?.let { group.id to it }
         }.toMap()
         if (dailyResetGroupIds.isEmpty() && weeklyResetDates.isEmpty()) {
-            return AutoResetResult(groups, tasks, emptySet())
+            return AutoResetResult(groups, tasks, emptySet(), hasChanges = false)
         }
         val newGroups = groups.map { group ->
             var updated = group
-            if (group.id in dailyResetGroupIds) updated = updated.copy(lastResetDate = today)
+            if (group.id in dailyResetGroupIds) {
+                // 当日のリセット時刻前に追い付いた場合に「当日実施済み」と誤記録しないよう、予定日を記録する
+                updated = updated.copy(lastResetDate = updated.latestDailyResetDate(today, currentHour))
+            }
             weeklyResetDates[group.id]?.let { updated = updated.copy(lastWeeklyResetDate = it) }
             updated
         }
+        // 折りたたみ解除はタスクが実際に未完了へ戻ったグループだけを対象にする
+        val changedGroupIds = mutableSetOf<String>()
         val newTasks = tasks.map { task ->
             val shouldReset = when (task.type) {
                 TaskType.DAILY -> task.groupId in dailyResetGroupIds
                 TaskType.WEEKLY -> task.groupId in weeklyResetDates
             }
-            if (shouldReset) task.copy(isCompleted = false) else task
+            if (shouldReset && task.isCompleted) {
+                changedGroupIds += task.groupId
+                task.copy(isCompleted = false)
+            } else {
+                task
+            }
         }
-        return AutoResetResult(newGroups, newTasks, dailyResetGroupIds + weeklyResetDates.keys)
+        return AutoResetResult(newGroups, newTasks, changedGroupIds, hasChanges = true)
     }
 
     fun addGroup(name: String) {

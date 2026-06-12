@@ -507,10 +507,12 @@ class HomeViewModelTest {
 
     @Test
     fun `auto reset does not trigger when current hour is before reset hour`() = runTest {
-        // 2026-04-05T02:00 UTC, resetHour=5 → hour=2 < 5 → no reset
+        // 2026-04-05T02:00 UTC, resetHour=5 → 前日 (4/4) の分は実施済み、当日の時刻前 → no reset
         val clock = fixedClock("2026-04-05T02:00:00Z")
         repository.saveAll(
-            groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
+            groups = listOf(
+                TaskGroup(id = "g1", name = "原神", resetHour = 5, lastResetDate = LocalDate(2026, 4, 4)),
+            ),
             tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
         )
         val vm = HomeViewModel(repository, clock, utc)
@@ -547,6 +549,30 @@ class HomeViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertTrue(vm.uiState.value.tasks.first().isCompleted)
+    }
+
+    @Test
+    fun `auto reset catches up when app was not launched for days`() = runTest {
+        // 火曜 (4/7) にリセット済みのまま金曜 (4/10) 3:00 に起動 → 木曜 5:00 の分まで追い付く
+        val clock = fixedClock("2026-04-10T03:00:00Z")
+        repository.saveAll(
+            groups = listOf(
+                TaskGroup(
+                    id = "g1",
+                    name = "原神",
+                    resetHour = 5,
+                    lastResetDate = LocalDate(2026, 4, 7),
+                    lastWeeklyResetDate = LocalDate(2026, 4, 6),
+                ),
+            ),
+            tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
+        )
+        val vm = HomeViewModel(repository, clock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.tasks.first().isCompleted)
+        // 金曜 5:00 の分はまだ実施していないので、実施日は木曜 (4/9) として記録される
+        assertEquals(LocalDate(2026, 4, 9), vm.uiState.value.groups.first().lastResetDate)
     }
 
     // --- Weekly reset tests ---
@@ -826,7 +852,9 @@ class HomeViewModelTest {
             override fun now(): Instant = instant
         }
         repository.saveAll(
-            groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
+            groups = listOf(
+                TaskGroup(id = "g1", name = "原神", resetHour = 5, lastResetDate = LocalDate(2026, 4, 4)),
+            ),
             tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
         )
         val vm = HomeViewModel(repository, mutableClock, utc)
@@ -846,7 +874,9 @@ class HomeViewModelTest {
     fun `manual refresh is no-op when condition is not met`() = runTest {
         val clock = fixedClock("2026-04-05T02:00:00Z")
         repository.saveAll(
-            groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
+            groups = listOf(
+                TaskGroup(id = "g1", name = "原神", resetHour = 5, lastResetDate = LocalDate(2026, 4, 4)),
+            ),
             tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
         )
         val vm = HomeViewModel(repository, clock, utc)
@@ -867,7 +897,9 @@ class HomeViewModelTest {
             override fun now(): Instant = instant
         }
         repository.saveAll(
-            groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
+            groups = listOf(
+                TaskGroup(id = "g1", name = "原神", resetHour = 5, lastResetDate = LocalDate(2026, 4, 4)),
+            ),
             tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
         )
         val vm = HomeViewModel(repository, mutableClock, utc)

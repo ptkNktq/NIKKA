@@ -11,9 +11,11 @@ private const val DAYS_IN_WEEK = 7
 fun TaskGroup.latestDailyResetDate(today: LocalDate, currentHour: Int): LocalDate =
     if (currentHour >= resetHour) today else today.minus(1, DateTimeUnit.DAY)
 
-/** 日次リセットが到来しているのにまだ実施されていなければ true */
-fun TaskGroup.isDailyResetPending(today: LocalDate, currentHour: Int): Boolean =
-    currentHour >= resetHour && lastResetDate != today
+/** 日次リセットが到来しているのにまだ実施されていなければ true。数日起動しなかった場合も追い付く */
+fun TaskGroup.isDailyResetPending(today: LocalDate, currentHour: Int): Boolean {
+    val latest = latestDailyResetDate(today, currentHour)
+    return lastResetDate == null || lastResetDate < latest
+}
 
 /** 週課の実効リセット時刻 (「日課と同じ時刻」設定なら日課リセット時刻) */
 fun TaskGroup.effectiveWeeklyResetHour(): Int = weeklyResetHour ?: resetHour
