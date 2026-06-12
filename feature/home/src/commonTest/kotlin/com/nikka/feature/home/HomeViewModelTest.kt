@@ -364,6 +364,31 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `changing collapse setting re-evaluates collapsed groups`() = runTest {
+        viewModel.addGroup("原神")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val groupId = viewModel.uiState.value.groups.first().id
+        viewModel.addTask(groupId, "日課1")
+        viewModel.addTask(groupId, "週課1", TaskType.WEEKLY)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val dailyId = viewModel.uiState.value.tasks.first { it.type == TaskType.DAILY }.id
+        viewModel.toggleTask(dailyId)
+        testDispatcher.scheduler.advanceUntilIdle()
+        // OFF (デフォルト) では週課未達のため折りたたまれない
+        assertFalse(groupId in viewModel.uiState.value.collapsedGroupIds)
+
+        // ON に切り替えると再評価されて折りたたまれる
+        repository.saveAppSettings(AppSettings(collapseOnDailyCompleted = true))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(groupId in viewModel.uiState.value.collapsedGroupIds)
+
+        // OFF に戻すと再評価されて展開される
+        repository.saveAppSettings(AppSettings(collapseOnDailyCompleted = false))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse(groupId in viewModel.uiState.value.collapsedGroupIds)
+    }
+
+    @Test
     fun `resetGroupTasks expands collapsed group`() = runTest {
         viewModel.addGroup("原神")
         testDispatcher.scheduler.advanceUntilIdle()
@@ -688,6 +713,74 @@ class HomeViewModelTest {
         vm.refreshAutoReset()
         testDispatcher.scheduler.advanceUntilIdle()
         assertFalse(vm.uiState.value.tasks.first().isCompleted)
+    }
+
+    @Test
+    fun `setResetHour applies pending daily reset before updating baseline`() = runTest {
+        // 月曜 2:00 に起動 (リセット時刻 5 時前) → リセットされないまま 10:00 まで起動しっぱなし
+        val mutableClock = object : Clock {
+            var instant: Instant = Instant.parse("2026-04-06T02:00:00Z")
+            override fun now(): Instant = instant
+        }
+        repository.saveAll(
+            groups = listOf(
+                TaskGroup(
+                    id = "g1",
+                    name = "原神",
+                    resetHour = 5,
+                    lastResetDate = LocalDate(2026, 4, 5),
+                    lastWeeklyResetDate = LocalDate(2026, 3, 30),
+                ),
+            ),
+            tasks = listOf(Task(id = "d1", groupId = "g1", title = "デイリー", isCompleted = true)),
+        )
+        val vm = HomeViewModel(repository, mutableClock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.tasks.first().isCompleted)
+
+        // 5 時のリセットが実施待ちの状態で時刻を変更 → 実施待ち分が先に適用される
+        mutableClock.instant = Instant.parse("2026-04-06T10:00:00Z")
+        vm.setResetHour("g1", 12)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.tasks.first().isCompleted)
+        // 実施済みの日付は巻き戻らず、当日 12 時に二重リセットされない
+        assertEquals(LocalDate(2026, 4, 6), vm.uiState.value.groups.first().lastResetDate)
+    }
+
+    @Test
+    fun `setWeeklyReset applies pending weekly reset before updating baseline`() = runTest {
+        // 月曜 2:00 に起動 (リセット時刻 5 時前) → 週次リセットされないまま 10:00 まで起動しっぱなし
+        val mutableClock = object : Clock {
+            var instant: Instant = Instant.parse("2026-04-06T02:00:00Z")
+            override fun now(): Instant = instant
+        }
+        repository.saveAll(
+            groups = listOf(
+                TaskGroup(
+                    id = "g1",
+                    name = "原神",
+                    resetHour = 5,
+                    lastResetDate = LocalDate(2026, 4, 6),
+                    resetDayOfWeek = 1,
+                    lastWeeklyResetDate = LocalDate(2026, 3, 30),
+                ),
+            ),
+            tasks = listOf(
+                Task(id = "w1", groupId = "g1", title = "週ボス", isCompleted = true, type = TaskType.WEEKLY),
+            ),
+        )
+        val vm = HomeViewModel(repository, mutableClock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.tasks.first().isCompleted)
+
+        // 月曜 5 時の週次リセットが実施待ちの状態で設定変更 → 実施待ち分が先に適用される
+        mutableClock.instant = Instant.parse("2026-04-06T10:00:00Z")
+        vm.setWeeklyReset("g1", 1, null)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.tasks.first().isCompleted)
+        assertEquals(LocalDate(2026, 4, 6), vm.uiState.value.groups.first().lastWeeklyResetDate)
     }
 
     @Test

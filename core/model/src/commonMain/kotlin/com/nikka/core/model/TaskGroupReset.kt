@@ -36,3 +36,15 @@ fun TaskGroup.pendingWeeklyResetDate(today: LocalDate, currentHour: Int): LocalD
     val last = lastWeeklyResetDate
     return if (last == null || last < latest) latest else null
 }
+
+/** 直近の日次リセット予定日を実施済み扱いにする。実施済みの日付は巻き戻さない */
+fun TaskGroup.withDailyResetBaseline(today: LocalDate, currentHour: Int): TaskGroup {
+    val baseline = latestDailyResetDate(today, currentHour)
+    return copy(lastResetDate = maxOf(lastResetDate ?: baseline, baseline))
+}
+
+/** 直近の週次リセット予定日を実施済み扱いにする。実施済みの日付は巻き戻さない */
+fun TaskGroup.withWeeklyResetBaseline(today: LocalDate, currentHour: Int): TaskGroup {
+    val baseline = latestWeeklyResetDate(today, currentHour)
+    return copy(lastWeeklyResetDate = maxOf(lastWeeklyResetDate ?: baseline, baseline))
+}

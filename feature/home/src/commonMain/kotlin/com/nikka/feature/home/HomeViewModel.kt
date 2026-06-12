@@ -8,9 +8,9 @@ import com.nikka.core.model.TaskGroup
 import com.nikka.core.model.TaskType
 import com.nikka.core.model.allTasksCompleted
 import com.nikka.core.model.isDailyResetPending
-import com.nikka.core.model.latestDailyResetDate
-import com.nikka.core.model.latestWeeklyResetDate
 import com.nikka.core.model.pendingWeeklyResetDate
+import com.nikka.core.model.withDailyResetBaseline
+import com.nikka.core.model.withWeeklyResetBaseline
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,7 +57,17 @@ class HomeViewModel(
         loadData()
         viewModelScope.launch {
             repository.appSettings.collect { settings ->
-                _uiState.update { it.copy(collapseOnDailyCompleted = settings.collapseOnDailyCompleted) }
+                _uiState.update { state ->
+                    state.copy(
+                        collapseOnDailyCompleted = settings.collapseOnDailyCompleted,
+                        // 完了判定の基準が変わるため、自動折りたたみ状態も再評価する (ロード完了前は対象なし)
+                        collapsedGroupIds = if (state.isLoading) {
+                            state.collapsedGroupIds
+                        } else {
+                            autoCollapsedGroupIds(state.groups, state.tasks, settings.collapseOnDailyCompleted)
+                        },
+                    )
+                }
             }
         }
     }
@@ -80,9 +90,11 @@ class HomeViewModel(
         val rawGroups = repository.loadGroups()
         val rawTasks = repository.loadTasks()
         val result = applyAutoReset(rawGroups, rawTasks)
-        val completedGroupIds = result.groups.map { it.id }.filter { groupId ->
-            shouldAutoCollapse(result.tasks.filter { it.groupId == groupId })
-        }.toSet()
+        val completedGroupIds = autoCollapsedGroupIds(
+            groups = result.groups,
+            tasks = result.tasks,
+            dailyOnly = repository.appSettings.value.collapseOnDailyCompleted,
+        )
         _uiState.update {
             it.copy(
                 groups = result.groups,
@@ -153,14 +165,12 @@ class HomeViewModel(
         val now = clock.now().toLocalDateTime(timeZone)
         _uiState.update { state ->
             // 作成時点までのリセット予定は実施済み扱いにして、直後の自動リセットを防ぐ
-            val base = TaskGroup(
+            val newGroup = TaskGroup(
                 id = Uuid.random().toString(),
                 name = name,
             )
-            val newGroup = base.copy(
-                lastResetDate = base.latestDailyResetDate(now.date, now.hour),
-                lastWeeklyResetDate = base.latestWeeklyResetDate(now.date, now.hour),
-            )
+                .withDailyResetBaseline(now.date, now.hour)
+                .withWeeklyResetBaseline(now.date, now.hour)
             state.copy(
                 groups = state.groups + newGroup,
                 isAddGroupDialogVisible = false,
@@ -209,16 +219,16 @@ class HomeViewModel(
             val newTasks = state.tasks.map { task ->
                 if (task.id == taskId) task.copy(isCompleted = !task.isCompleted) else task
             }
-            val groupId = state.tasks.find { it.id == taskId }?.groupId
-            val autoCollapse = if (groupId != null) {
-                shouldAutoCollapse(newTasks.filter { it.groupId == groupId })
-            } else {
-                false
+            // トグルしたタスクのグループが完了状態になったら自動で折りたたむ
+            val collapseGroupId = state.tasks.find { it.id == taskId }?.groupId?.takeIf { groupId ->
+                newTasks
+                    .filter { it.groupId == groupId }
+                    .allTasksCompleted(dailyOnly = repository.appSettings.value.collapseOnDailyCompleted)
             }
             state.copy(
                 tasks = newTasks,
-                collapsedGroupIds = if (autoCollapse && groupId != null) {
-                    state.collapsedGroupIds + groupId
+                collapsedGroupIds = if (collapseGroupId != null) {
+                    state.collapsedGroupIds + collapseGroupId
                 } else {
                     state.collapsedGroupIds
                 },
@@ -331,24 +341,25 @@ class HomeViewModel(
     fun setResetHour(groupId: String, hour: Int) {
         val now = clock.now().toLocalDateTime(timeZone)
         _uiState.update { state ->
+            // 変更前の設定で実施待ちのリセットを先に適用してから、新しい設定を反映する。
+            // これをしないと、実施待ちだったリセットが「実施済み扱い」で握り潰される
+            val caughtUp = applyAutoReset(state.groups, state.tasks)
             state.copy(
-                groups = state.groups.map { group ->
+                groups = caughtUp.groups.map { group ->
                     if (group.id != groupId) {
                         group
                     } else {
                         // 変更時点までのリセット予定は実施済み扱いにして、当日の進捗を消さない。
                         // 週課が「日課と同じ時刻」設定の場合はリセット時刻が連動するため、週次側も同様に扱う
-                        val configured = group.copy(resetHour = hour)
-                        configured.copy(
-                            lastResetDate = configured.latestDailyResetDate(now.date, now.hour),
-                            lastWeeklyResetDate = if (configured.weeklyResetHour == null) {
-                                configured.latestWeeklyResetDate(now.date, now.hour)
-                            } else {
-                                configured.lastWeeklyResetDate
-                            },
-                        )
+                        var configured = group.copy(resetHour = hour).withDailyResetBaseline(now.date, now.hour)
+                        if (configured.weeklyResetHour == null) {
+                            configured = configured.withWeeklyResetBaseline(now.date, now.hour)
+                        }
+                        configured
                     }
                 },
+                tasks = caughtUp.tasks,
+                collapsedGroupIds = state.collapsedGroupIds - caughtUp.resetGroupIds,
                 resetHourTargetGroupId = null,
             )
         }
@@ -366,30 +377,36 @@ class HomeViewModel(
     fun setWeeklyReset(groupId: String, isoDayOfWeek: Int, weeklyResetHour: Int?) {
         val now = clock.now().toLocalDateTime(timeZone)
         _uiState.update { state ->
+            // 変更前の設定で実施待ちのリセットを先に適用してから、新しい設定を反映する
+            val caughtUp = applyAutoReset(state.groups, state.tasks)
             state.copy(
-                groups = state.groups.map { group ->
+                groups = caughtUp.groups.map { group ->
                     if (group.id != groupId) {
                         group
                     } else {
                         // 設定時点の週課の進捗を消さないよう、直近のリセット予定日を実施済み扱いにする
-                        val configured = group.copy(
+                        group.copy(
                             resetDayOfWeek = isoDayOfWeek,
                             weeklyResetHour = weeklyResetHour,
-                        )
-                        configured.copy(
-                            lastWeeklyResetDate = configured.latestWeeklyResetDate(now.date, now.hour),
-                        )
+                        ).withWeeklyResetBaseline(now.date, now.hour)
                     }
                 },
+                tasks = caughtUp.tasks,
+                collapsedGroupIds = state.collapsedGroupIds - caughtUp.resetGroupIds,
                 weeklyResetTargetGroupId = null,
             )
         }
         persistAll()
     }
 
-    /** グループを自動で折りたたむべきか。「日課完了で折りたたむ」設定に従う */
-    private fun shouldAutoCollapse(groupTasks: List<Task>): Boolean =
-        groupTasks.allTasksCompleted(dailyOnly = repository.appSettings.value.collapseOnDailyCompleted)
+    /** 自動折りたたみ対象 (「日課完了で折りたたむ」設定に応じた完了済みグループ) を返す */
+    private fun autoCollapsedGroupIds(
+        groups: List<TaskGroup>,
+        tasks: List<Task>,
+        dailyOnly: Boolean,
+    ): Set<String> = groups.map { it.id }.filter { groupId ->
+        tasks.filter { it.groupId == groupId }.allTasksCompleted(dailyOnly = dailyOnly)
+    }.toSet()
 
     private fun persistAll() {
         val snapshot = _uiState.value
