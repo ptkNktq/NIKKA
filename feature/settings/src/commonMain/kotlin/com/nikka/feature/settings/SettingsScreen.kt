@@ -25,15 +25,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.nikka.core.data.TaskRepository
 import com.nikka.core.model.NotificationSettings
-import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 import java.awt.Desktop
 import java.net.URI
 
@@ -42,10 +41,10 @@ fun SettingsScreen(
     onNavigateToNotification: () -> Unit,
     onNavigateToLicense: () -> Unit,
     repository: TaskRepository = koinInject(),
+    appSettingsViewModel: AppSettingsViewModel = koinViewModel(),
 ) {
     val notificationSettings by repository.notificationSettings.collectAsState()
-    val appSettings by repository.appSettings.collectAsState()
-    val scope = rememberCoroutineScope()
+    val appSettings by appSettingsViewModel.appSettings.collectAsState()
 
     Column(
         modifier = Modifier
@@ -63,11 +62,7 @@ fun SettingsScreen(
                 "OFF / 週課を含むすべてのタスクが完了したら折りたたみ・完了表示 (緑) にする"
             },
             checked = appSettings.collapseOnDailyCompleted,
-            onCheckedChange = { checked ->
-                scope.launch {
-                    repository.saveAppSettings(appSettings.copy(collapseOnDailyCompleted = checked))
-                }
-            },
+            onCheckedChange = appSettingsViewModel::setCollapseOnDailyCompleted,
         )
 
         SectionDivider(title = "通知")
