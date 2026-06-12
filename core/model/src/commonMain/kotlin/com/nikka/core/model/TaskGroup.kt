@@ -12,6 +12,11 @@ data class TaskGroup(
     val lastResetDate: LocalDate? = null,
     /** 週課のリセット曜日 (ISO 8601: 1=月曜 .. 7=日曜) */
     val resetDayOfWeek: Int = DEFAULT_RESET_DAY_OF_WEEK,
+    /**
+     * 週課のリセット時刻 (0-23)。null は「日課と同じ時刻」を意味し、[resetHour] を参照する。
+     * 値をコピーせず null で表すことで、日課リセット時刻の変更に自動で追従する。
+     */
+    val weeklyResetHour: Int? = null,
     val lastWeeklyResetDate: LocalDate? = null,
 ) {
     init {
@@ -20,6 +25,9 @@ data class TaskGroup(
         }
         require(resetDayOfWeek in MIN_ISO_DAY..MAX_ISO_DAY) {
             "resetDayOfWeek must be in 1..7, but was $resetDayOfWeek"
+        }
+        require(weeklyResetHour == null || weeklyResetHour in 0..MAX_HOUR) {
+            "weeklyResetHour must be null or in 0..23, but was $weeklyResetHour"
         }
     }
 

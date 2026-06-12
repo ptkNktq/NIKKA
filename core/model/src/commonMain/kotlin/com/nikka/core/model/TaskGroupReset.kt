@@ -15,15 +15,15 @@ fun TaskGroup.latestDailyResetDate(today: LocalDate, currentHour: Int): LocalDat
 fun TaskGroup.isDailyResetPending(today: LocalDate, currentHour: Int): Boolean =
     currentHour >= resetHour && lastResetDate != today
 
-/**
- * 直近に到来した週次リセット予定日を返す。
- * リセット時刻は日課リセット時刻 (resetHour) を流用する。
- */
+/** 週課の実効リセット時刻 (「日課と同じ時刻」設定なら日課リセット時刻) */
+fun TaskGroup.effectiveWeeklyResetHour(): Int = weeklyResetHour ?: resetHour
+
+/** 直近に到来した週次リセット予定日を返す */
 fun TaskGroup.latestWeeklyResetDate(today: LocalDate, currentHour: Int): LocalDate {
     val daysSinceResetDay = (today.dayOfWeek.isoDayNumber - resetDayOfWeek + DAYS_IN_WEEK) % DAYS_IN_WEEK
     val candidate = today.minus(daysSinceResetDay, DateTimeUnit.DAY)
     // リセット曜日当日でまだ時刻前なら、1 週間前が直近のリセット予定日
-    return if (daysSinceResetDay == 0 && currentHour < resetHour) {
+    return if (daysSinceResetDay == 0 && currentHour < effectiveWeeklyResetHour()) {
         candidate.minus(DAYS_IN_WEEK, DateTimeUnit.DAY)
     } else {
         candidate
