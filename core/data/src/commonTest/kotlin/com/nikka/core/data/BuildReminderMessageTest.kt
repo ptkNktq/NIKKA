@@ -6,13 +6,13 @@ import kotlin.test.assertEquals
 class BuildReminderMessageTest {
 
     @Test
-    fun `message lists header and titles`() {
+    fun `message lists header and group names`() {
         val message = buildReminderMessage(
             prefix = null,
             header = "以下の日課が未達成です。",
-            titles = listOf("デイリー任務", "樹脂消費"),
+            groupNames = listOf("原神", "スターレイル"),
         )
-        assertEquals("以下の日課が未達成です。\n- デイリー任務\n- 樹脂消費", message)
+        assertEquals("以下の日課が未達成です。\n- 原神\n- スターレイル", message)
     }
 
     @Test
@@ -20,9 +20,9 @@ class BuildReminderMessageTest {
         val message = buildReminderMessage(
             prefix = "<@123456789>",
             header = "以下の週課が未達成です。",
-            titles = listOf("週ボス"),
+            groupNames = listOf("原神"),
         )
-        assertEquals("<@123456789>\n以下の週課が未達成です。\n- 週ボス", message)
+        assertEquals("<@123456789>\n以下の週課が未達成です。\n- 原神", message)
     }
 
     @Test
@@ -30,8 +30,8 @@ class BuildReminderMessageTest {
         val message = buildReminderMessage(
             prefix = "   ",
             header = "以下の日課が未達成です。",
-            titles = listOf("デイリー任務"),
+            groupNames = listOf("原神"),
         )
-        assertEquals("以下の日課が未達成です。\n- デイリー任務", message)
+        assertEquals("以下の日課が未達成です。\n- 原神", message)
     }
 }

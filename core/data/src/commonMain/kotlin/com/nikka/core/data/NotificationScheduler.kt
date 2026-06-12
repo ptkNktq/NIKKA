@@ -161,14 +161,14 @@ class NotificationScheduler(
         today: LocalDate,
     ): Boolean {
         if (repository.loadLastNotifiedDate() == today) return true
-        val titles = uncompletedDailyTaskTitles(
+        val groupNames = uncompletedDailyGroupNames(
             groups = repository.loadGroups(),
             tasks = repository.loadTasks(),
             currentHour = currentHour,
             today = today,
         )
-        val sent = if (titles.isNotEmpty()) {
-            val message = buildReminderMessage(settings.messagePrefix, DAILY_REMINDER_HEADER, titles)
+        val sent = if (groupNames.isNotEmpty()) {
+            val message = buildReminderMessage(settings.messagePrefix, DAILY_REMINDER_HEADER, groupNames)
             webhookClient.send(settings.webhookUrl, message).isSuccess
         } else {
             // 未達成 0 件の日は送らない。当日再度増えても再通知しない仕様なのでフラグだけ立てる
@@ -184,14 +184,14 @@ class NotificationScheduler(
         today: LocalDate,
     ): Boolean {
         if (repository.loadLastWeeklyNotifiedDate() == today) return true
-        val titles = uncompletedWeeklyTaskTitles(
+        val groupNames = uncompletedWeeklyGroupNames(
             groups = repository.loadGroups(),
             tasks = repository.loadTasks(),
             currentHour = currentHour,
             today = today,
         )
-        val sent = if (titles.isNotEmpty()) {
-            val message = buildReminderMessage(settings.messagePrefix, WEEKLY_REMINDER_HEADER, titles)
+        val sent = if (groupNames.isNotEmpty()) {
+            val message = buildReminderMessage(settings.messagePrefix, WEEKLY_REMINDER_HEADER, groupNames)
             webhookClient.send(settings.webhookUrl, message).isSuccess
         } else {
             // 通知対象 0 件の日は送らない。フラグだけ立てて当日の再評価を抑止する
@@ -233,65 +233,63 @@ class NotificationScheduler(
  * ```
  * {prefix}
  * {header}
- * - タスク1
- * - タスク2
+ * - グループ1
+ * - グループ2
  * ```
  *
  * prefix が null / 空白のみの場合は省略する。
  */
-internal fun buildReminderMessage(prefix: String?, header: String, titles: List<String>): String =
+internal fun buildReminderMessage(prefix: String?, header: String, groupNames: List<String>): String =
     buildString {
         if (!prefix.isNullOrBlank()) appendLine(prefix)
         append(header)
-        titles.forEach { append("\n- ").append(it) }
+        groupNames.forEach { append("\n- ").append(it) }
     }
 
 /**
- * 日課リマインダー対象の未達成タスク名を表示順で返す。週課は対象外。空なら通知不要。
+ * 未達成の日課が残っているグループ名を表示順で返す。週課は対象外。空なら通知不要。
  *
  * HomeViewModel が動いていない間に resetHour が到達した場合、[Task.isCompleted]
  * は前日のまま = true のことがある。そのようなグループの日課は「未完了扱い」で判定する。
  */
-internal fun uncompletedDailyTaskTitles(
+internal fun uncompletedDailyGroupNames(
     groups: List<TaskGroup>,
     tasks: List<Task>,
     currentHour: Int,
     today: LocalDate,
-): List<String> {
-    val pendingResetGroupIds = groups
-        .filter { it.isDailyResetPending(today, currentHour) }
-        .map { it.id }
-        .toSet()
-    return tasks
-        .filter { task ->
-            task.type == TaskType.DAILY && (!task.isCompleted || task.groupId in pendingResetGroupIds)
+): List<String> =
+    groups
+        .filter { group ->
+            val pendingReset = group.isDailyResetPending(today, currentHour)
+            tasks.any { task ->
+                task.groupId == group.id &&
+                    task.type == TaskType.DAILY &&
+                    (!task.isCompleted || pendingReset)
+            }
         }
-        .map { it.title }
-}
+        .map { it.name }
 
 /**
- * 週課リマインダー対象の未達成タスク名を表示順で返す。空なら通知不要。
- * 対象は「翌日が週課リセット曜日」のグループの週課のみ (リセットで消える前日に知らせる)。
+ * 未達成の週課が残っているグループ名を表示順で返す。空なら通知不要。
+ * 対象は「翌日が週課リセット曜日」のグループのみ (リセットで消える前日に知らせる)。
  * 週次リセットが未実施のグループは完了フラグが前週のままの可能性があるため「未完了扱い」で判定する。
  */
-internal fun uncompletedWeeklyTaskTitles(
+internal fun uncompletedWeeklyGroupNames(
     groups: List<TaskGroup>,
     tasks: List<Task>,
     currentHour: Int,
     today: LocalDate,
 ): List<String> {
-    val targetGroupIds = mutableSetOf<String>()
-    val pendingResetGroupIds = mutableSetOf<String>()
     val tomorrowIsoDay = today.plus(1, DateTimeUnit.DAY).dayOfWeek.isoDayNumber
-    groups.filter { it.resetDayOfWeek == tomorrowIsoDay }.forEach { group ->
-        targetGroupIds += group.id
-        if (group.pendingWeeklyResetDate(today, currentHour) != null) pendingResetGroupIds += group.id
-    }
-    return tasks
-        .filter { task ->
-            task.type == TaskType.WEEKLY &&
-                task.groupId in targetGroupIds &&
-                (!task.isCompleted || task.groupId in pendingResetGroupIds)
+    return groups
+        .filter { it.resetDayOfWeek == tomorrowIsoDay }
+        .filter { group ->
+            val pendingReset = group.pendingWeeklyResetDate(today, currentHour) != null
+            tasks.any { task ->
+                task.groupId == group.id &&
+                    task.type == TaskType.WEEKLY &&
+                    (!task.isCompleted || pendingReset)
+            }
         }
-        .map { it.title }
+        .map { it.name }
 }
