@@ -53,11 +53,8 @@ class NotificationSettingsViewModel(
 
     fun setWebhookUrl(url: String) = updateAndPersist { it.copy(webhookUrl = url) }
 
-    fun setMessage(message: String) =
-        updateAndPersist { it.copy(message = message.ifBlank { null }) }
-
-    fun setWeeklyMessage(message: String) =
-        updateAndPersist { it.copy(weeklyMessage = message.ifBlank { null }) }
+    fun setMessagePrefix(prefix: String) =
+        updateAndPersist { it.copy(messagePrefix = prefix.ifBlank { null }) }
 
     fun setHour(hour: Int) = updateAndPersist { it.copy(hour = hour) }
 
@@ -84,7 +81,8 @@ class NotificationSettingsViewModel(
             _uiState.update {
                 it.copy(testSendStatus = TestSendStatus.Sending, testSendError = null)
             }
-            val content = "[NIKKA テスト通知]\n${current.message ?: NotificationSettings.DEFAULT_MESSAGE}"
+            val prefixLine = current.messagePrefix?.takeIf { it.isNotBlank() }?.let { "$it\n" } ?: ""
+            val content = "$prefixLine[NIKKA テスト通知] Webhook の疎通確認用メッセージです。"
             val result = webhookClient.send(current.webhookUrl, content)
             _uiState.update {
                 if (result.isSuccess) {

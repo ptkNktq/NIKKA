@@ -69,8 +69,7 @@ fun NotificationSettingsScreen(
             testSendStatus = state.testSendStatus,
             testSendError = state.testSendError,
             onWebhookUrlChange = viewModel::setWebhookUrl,
-            onMessageChange = viewModel::setMessage,
-            onWeeklyMessageChange = viewModel::setWeeklyMessage,
+            onMessagePrefixChange = viewModel::setMessagePrefix,
             onHourClick = viewModel::showHourDialog,
             onTestSendClick = viewModel::sendTestMessage,
         )
@@ -94,8 +93,7 @@ private fun NotificationFields(
     testSendStatus: TestSendStatus,
     testSendError: String?,
     onWebhookUrlChange: (String) -> Unit,
-    onMessageChange: (String) -> Unit,
-    onWeeklyMessageChange: (String) -> Unit,
+    onMessagePrefixChange: (String) -> Unit,
     onHourClick: () -> Unit,
     onTestSendClick: () -> Unit,
 ) {
@@ -109,20 +107,11 @@ private fun NotificationFields(
         enabled = settings.enabled,
     )
     OutlinedTextField(
-        value = settings.message.orEmpty(),
-        onValueChange = onMessageChange,
+        value = settings.messagePrefix.orEmpty(),
+        onValueChange = onMessagePrefixChange,
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-        label = { Text("日課メッセージ") },
-        placeholder = { Text("未入力時はデフォルト文言で送信") },
-        maxLines = 4,
-        enabled = settings.enabled,
-    )
-    OutlinedTextField(
-        value = settings.weeklyMessage.orEmpty(),
-        onValueChange = onWeeklyMessageChange,
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-        label = { Text("週課メッセージ") },
-        placeholder = { Text("未入力時はデフォルト文言で送信") },
+        label = { Text("メッセージプレフィックス") },
+        placeholder = { Text("通知の先頭に付ける文言 (メンション等)。未入力なら付けない") },
         maxLines = 4,
         enabled = settings.enabled,
     )

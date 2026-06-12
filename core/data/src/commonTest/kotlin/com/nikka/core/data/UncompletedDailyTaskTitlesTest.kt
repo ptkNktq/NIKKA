@@ -5,34 +5,38 @@ import com.nikka.core.model.TaskGroup
 import com.nikka.core.model.TaskType
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
-import kotlin.test.assertFalse
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class HasUncompletedDailyTasksTest {
+class UncompletedDailyTaskTitlesTest {
 
     private val today = LocalDate(2026, 6, 12)
     private val group = TaskGroup(id = "g1", name = "原神", lastResetDate = today)
 
     private fun task(
-        id: String,
+        title: String,
         isCompleted: Boolean,
         type: TaskType = TaskType.DAILY,
-    ) = Task(id = id, groupId = "g1", title = id, isCompleted = isCompleted, type = type)
+    ) = Task(id = title, groupId = "g1", title = title, isCompleted = isCompleted, type = type)
 
     @Test
-    fun `uncompleted daily task triggers reminder`() {
-        val result = hasUncompletedDailyTasks(
+    fun `uncompleted daily tasks are listed in display order`() {
+        val titles = uncompletedDailyTaskTitles(
             groups = listOf(group),
-            tasks = listOf(task("daily", isCompleted = false)),
+            tasks = listOf(
+                task("デイリー任務", isCompleted = false),
+                task("樹脂消費", isCompleted = true),
+                task("探索派遣", isCompleted = false),
+            ),
             currentHour = 21,
             today = today,
         )
-        assertTrue(result)
+        assertEquals(listOf("デイリー任務", "探索派遣"), titles)
     }
 
     @Test
-    fun `uncompleted weekly task does not trigger reminder when all dailies are completed`() {
-        val result = hasUncompletedDailyTasks(
+    fun `uncompleted weekly task is not listed even when all dailies are completed`() {
+        val titles = uncompletedDailyTaskTitles(
             groups = listOf(group),
             tasks = listOf(
                 task("daily", isCompleted = true),
@@ -41,11 +45,11 @@ class HasUncompletedDailyTasksTest {
             currentHour = 21,
             today = today,
         )
-        assertFalse(result)
+        assertTrue(titles.isEmpty())
     }
 
     @Test
-    fun `completed daily task in pending-reset group is treated as uncompleted`() {
+    fun `completed daily task in pending-reset group is listed`() {
         // resetHour 到達済みかつ当日未リセット → 前日の完了フラグは信用しない
         val pendingGroup = TaskGroup(
             id = "g1",
@@ -53,36 +57,18 @@ class HasUncompletedDailyTasksTest {
             resetHour = 5,
             lastResetDate = today.minusOneDay(),
         )
-        val result = hasUncompletedDailyTasks(
+        val titles = uncompletedDailyTaskTitles(
             groups = listOf(pendingGroup),
             tasks = listOf(task("daily", isCompleted = true)),
             currentHour = 21,
             today = today,
         )
-        assertTrue(result)
+        assertEquals(listOf("daily"), titles)
     }
 
     @Test
-    fun `completed weekly task in pending-reset group does not trigger reminder`() {
-        // 日次リセットは週課を未完了に戻さないため、リセット待機でも週課は未達成扱いにしない
-        val pendingGroup = TaskGroup(
-            id = "g1",
-            name = "原神",
-            resetHour = 5,
-            lastResetDate = today.minusOneDay(),
-        )
-        val result = hasUncompletedDailyTasks(
-            groups = listOf(pendingGroup),
-            tasks = listOf(task("weekly", isCompleted = true, type = TaskType.WEEKLY)),
-            currentHour = 21,
-            today = today,
-        )
-        assertFalse(result)
-    }
-
-    @Test
-    fun `all tasks completed does not trigger reminder`() {
-        val result = hasUncompletedDailyTasks(
+    fun `all tasks completed yields empty list`() {
+        val titles = uncompletedDailyTaskTitles(
             groups = listOf(group),
             tasks = listOf(
                 task("daily", isCompleted = true),
@@ -91,7 +77,7 @@ class HasUncompletedDailyTasksTest {
             currentHour = 21,
             today = today,
         )
-        assertFalse(result)
+        assertTrue(titles.isEmpty())
     }
 
     private fun LocalDate.minusOneDay(): LocalDate = LocalDate.fromEpochDays(toEpochDays() - 1)
