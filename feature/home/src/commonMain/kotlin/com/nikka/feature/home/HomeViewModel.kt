@@ -73,8 +73,7 @@ class HomeViewModel(
         val rawTasks = repository.loadTasks()
         val result = applyAutoReset(rawGroups, rawTasks)
         val completedGroupIds = result.groups.map { it.id }.filter { groupId ->
-            val groupTasks = result.tasks.filter { it.groupId == groupId }
-            groupTasks.isNotEmpty() && groupTasks.all { it.isCompleted }
+            shouldAutoCollapse(result.tasks.filter { it.groupId == groupId })
         }.toSet()
         _uiState.update {
             it.copy(
@@ -204,8 +203,7 @@ class HomeViewModel(
             }
             val groupId = state.tasks.find { it.id == taskId }?.groupId
             val autoCollapse = if (groupId != null) {
-                val groupTasks = newTasks.filter { it.groupId == groupId }
-                groupTasks.isNotEmpty() && groupTasks.all { it.isCompleted }
+                shouldAutoCollapse(newTasks.filter { it.groupId == groupId })
             } else {
                 false
             }
@@ -379,6 +377,20 @@ class HomeViewModel(
             )
         }
         persistAll()
+    }
+
+    /**
+     * グループを自動で折りたたむべきか。
+     * 「日課完了で折りたたむ」設定が ON の場合は日課のみで判定する
+     * (日課が 1 つもないグループは従来通り全タスクで判定)。
+     */
+    private fun shouldAutoCollapse(groupTasks: List<Task>): Boolean {
+        val targets = if (repository.appSettings.value.collapseOnDailyCompleted) {
+            groupTasks.filter { it.type == TaskType.DAILY }.ifEmpty { groupTasks }
+        } else {
+            groupTasks
+        }
+        return targets.isNotEmpty() && targets.all { it.isCompleted }
     }
 
     private fun persistAll() {

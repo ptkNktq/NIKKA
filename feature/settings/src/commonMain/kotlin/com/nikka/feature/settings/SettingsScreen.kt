@@ -16,19 +16,23 @@ import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.UnfoldLess
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.nikka.core.data.TaskRepository
 import com.nikka.core.model.NotificationSettings
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.awt.Desktop
 import java.net.URI
@@ -40,6 +44,8 @@ fun SettingsScreen(
     repository: TaskRepository = koinInject(),
 ) {
     val notificationSettings by repository.notificationSettings.collectAsState()
+    val appSettings by repository.appSettings.collectAsState()
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -47,6 +53,23 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(vertical = 8.dp),
     ) {
+        SectionDivider(title = "表示")
+        SettingsToggleItem(
+            icon = Icons.Rounded.UnfoldLess,
+            title = "日課完了でグループを折りたたむ",
+            subtitle = if (appSettings.collapseOnDailyCompleted) {
+                "ON / 週課が未達成でも、日課がすべて完了していれば折りたたむ"
+            } else {
+                "OFF / 週課を含むすべてのタスクが完了したら折りたたむ"
+            },
+            checked = appSettings.collapseOnDailyCompleted,
+            onCheckedChange = { checked ->
+                scope.launch {
+                    repository.saveAppSettings(appSettings.copy(collapseOnDailyCompleted = checked))
+                }
+            },
+        )
+
         SectionDivider(title = "通知")
         SettingsItem(
             icon = Icons.Rounded.Notifications,
@@ -94,6 +117,39 @@ private fun SectionDivider(title: String) {
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 4.dp),
         )
+    }
+}
+
+@Composable
+private fun SettingsToggleItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

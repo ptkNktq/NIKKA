@@ -1,6 +1,7 @@
 package com.nikka.feature.home
 
 import com.nikka.core.data.FakeTaskRepository
+import com.nikka.core.model.AppSettings
 import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
 import com.nikka.core.model.TaskType
@@ -326,6 +327,40 @@ class HomeViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertTrue(groupId in viewModel.uiState.value.collapsedGroupIds)
+    }
+
+    @Test
+    fun `toggleTask collapses group with pending weekly when collapse setting is on`() = runTest {
+        repository.saveAppSettings(AppSettings(collapseOnDailyCompleted = true))
+        viewModel.addGroup("原神")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val groupId = viewModel.uiState.value.groups.first().id
+        viewModel.addTask(groupId, "日課1")
+        viewModel.addTask(groupId, "週課1", TaskType.WEEKLY)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val dailyId = viewModel.uiState.value.tasks.first { it.type == TaskType.DAILY }.id
+
+        // 週課が未完了でも、日課がすべて完了すれば折りたたまれる
+        viewModel.toggleTask(dailyId)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(groupId in viewModel.uiState.value.collapsedGroupIds)
+    }
+
+    @Test
+    fun `toggleTask does not collapse group with pending weekly when collapse setting is off`() = runTest {
+        viewModel.addGroup("原神")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val groupId = viewModel.uiState.value.groups.first().id
+        viewModel.addTask(groupId, "日課1")
+        viewModel.addTask(groupId, "週課1", TaskType.WEEKLY)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val dailyId = viewModel.uiState.value.tasks.first { it.type == TaskType.DAILY }.id
+
+        viewModel.toggleTask(dailyId)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(groupId in viewModel.uiState.value.collapsedGroupIds)
     }
 
     @Test
