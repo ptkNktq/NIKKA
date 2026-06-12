@@ -127,7 +127,7 @@ class HomeViewModel(
                     it.copy(
                         groups = result.groups,
                         tasks = result.tasks,
-                        // リセットで全タスク未完了になったグループは折りたたみを解除する
+                        // リセットでタスクが未完了に戻ったグループは折りたたみを解除する
                         collapsedGroupIds = it.collapsedGroupIds - result.resetGroupIds,
                     )
                 }
