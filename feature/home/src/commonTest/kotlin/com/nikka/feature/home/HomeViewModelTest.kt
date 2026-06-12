@@ -640,7 +640,7 @@ class HomeViewModelTest {
         val vm = HomeViewModel(repository, mutableClock, utc)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        vm.setResetDayOfWeek("g1", 4)
+        vm.setWeeklyReset("g1", 4, null)
         testDispatcher.scheduler.advanceUntilIdle()
         assertEquals(4, vm.uiState.value.groups.first().resetDayOfWeek)
 
@@ -650,6 +650,39 @@ class HomeViewModelTest {
 
         // 木曜になったらリセットされる
         mutableClock.instant = Instant.parse("2026-04-09T10:00:00Z")
+        vm.refreshAutoReset()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse(vm.uiState.value.tasks.first().isCompleted)
+    }
+
+    @Test
+    fun `weekly reset uses its own reset hour when set`() = runTest {
+        // 月曜 07:00。日課リセット時刻 (5時) は過ぎているが、週課独自の 10 時はまだ → 週課はリセットされない
+        val mutableClock = object : Clock {
+            var instant: Instant = Instant.parse("2026-04-06T07:00:00Z")
+            override fun now(): Instant = instant
+        }
+        repository.saveAll(
+            groups = listOf(
+                TaskGroup(
+                    id = "g1",
+                    name = "原神",
+                    resetHour = 5,
+                    resetDayOfWeek = 1,
+                    weeklyResetHour = 10,
+                    lastWeeklyResetDate = LocalDate(2026, 3, 30),
+                ),
+            ),
+            tasks = listOf(
+                Task(id = "w1", groupId = "g1", title = "週ボス", isCompleted = true, type = TaskType.WEEKLY),
+            ),
+        )
+        val vm = HomeViewModel(repository, mutableClock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.tasks.first().isCompleted)
+
+        // 10 時を過ぎたらリセットされる
+        mutableClock.instant = Instant.parse("2026-04-06T11:00:00Z")
         vm.refreshAutoReset()
         testDispatcher.scheduler.advanceUntilIdle()
         assertFalse(vm.uiState.value.tasks.first().isCompleted)

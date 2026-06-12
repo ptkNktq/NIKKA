@@ -23,10 +23,12 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.onClick
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.rounded.Add
@@ -82,6 +84,7 @@ import androidx.compose.ui.unit.dp
 import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
 import com.nikka.core.model.TaskType
+import com.nikka.core.model.effectiveWeeklyResetHour
 import com.nikka.core.ui.component.ProvideTopBarActions
 import com.nikka.core.ui.theme.StatusGreen
 import com.nikka.core.ui.theme.StatusRed
@@ -119,7 +122,7 @@ fun HomeScreen(
             onSettleDrag = viewModel::settleDrag,
             onMoveTask = viewModel::moveTask,
             onSetResetHour = viewModel::showResetHourDialog,
-            onSetResetDayOfWeek = viewModel::showResetDayOfWeekDialog,
+            onSetWeeklyReset = viewModel::showWeeklyResetDialog,
         )
         FloatingActionButton(
             onClick = { viewModel.showAddGroupDialog() },
@@ -151,7 +154,7 @@ private fun HomeContent(
     onSettleDrag: () -> Unit,
     onMoveTask: (String, TaskType, Int, Int) -> Unit,
     onSetResetHour: (String) -> Unit,
-    onSetResetDayOfWeek: (String) -> Unit,
+    onSetWeeklyReset: (String) -> Unit,
 ) {
     if (uiState.groups.isEmpty()) {
         EmptyState()
@@ -182,7 +185,7 @@ private fun HomeContent(
                             onRemoveGroup = { onRemoveGroup(group.id) },
                             onResetGroup = { onResetGroup(group.id) },
                             onSetResetHour = { onSetResetHour(group.id) },
-                            onSetResetDayOfWeek = { onSetResetDayOfWeek(group.id) },
+                            onSetWeeklyReset = { onSetWeeklyReset(group.id) },
                             onMoveTask = onMoveTask,
                         ),
                         dragModifier = Modifier.draggableHandle(
@@ -240,13 +243,14 @@ private fun HomeDialogs(uiState: HomeUiState, viewModel: HomeViewModel) {
             )
         }
     }
-    if (uiState.resetDayOfWeekTargetGroupId != null) {
-        val group = uiState.groups.find { it.id == uiState.resetDayOfWeekTargetGroupId }
+    if (uiState.weeklyResetTargetGroupId != null) {
+        val group = uiState.groups.find { it.id == uiState.weeklyResetTargetGroupId }
         if (group != null) {
-            ResetDayOfWeekDialog(
+            WeeklyResetDialog(
                 currentDay = group.resetDayOfWeek,
-                onConfirm = { day -> viewModel.setResetDayOfWeek(group.id, day) },
-                onDismiss = viewModel::dismissResetDayOfWeekDialog,
+                currentWeeklyHour = group.weeklyResetHour,
+                onConfirm = { day, hour -> viewModel.setWeeklyReset(group.id, day, hour) },
+                onDismiss = viewModel::dismissWeeklyResetDialog,
             )
         }
     }
@@ -319,7 +323,7 @@ private data class GroupCardActions(
     val onRemoveGroup: () -> Unit,
     val onResetGroup: () -> Unit,
     val onSetResetHour: () -> Unit,
-    val onSetResetDayOfWeek: () -> Unit,
+    val onSetWeeklyReset: () -> Unit,
     val onMoveTask: (String, TaskType, Int, Int) -> Unit,
 )
 
@@ -398,8 +402,6 @@ private fun GroupCardHeader(
         GroupContextMenu(
             expanded = showContextMenu,
             offset = contextMenuOffset,
-            resetHour = group.resetHour,
-            resetDayOfWeek = group.resetDayOfWeek,
             onDismiss = { showContextMenu = false },
             onAddTask = { type ->
                 showContextMenu = false
@@ -409,9 +411,9 @@ private fun GroupCardHeader(
                 showContextMenu = false
                 actions.onSetResetHour()
             },
-            onSetResetDayOfWeek = {
+            onSetWeeklyReset = {
                 showContextMenu = false
-                actions.onSetResetDayOfWeek()
+                actions.onSetWeeklyReset()
             },
             onRemove = {
                 showContextMenu = false
@@ -520,12 +522,10 @@ private fun GroupCardTitle(
 private fun GroupContextMenu(
     expanded: Boolean,
     offset: DpOffset = DpOffset.Zero,
-    resetHour: Int,
-    resetDayOfWeek: Int,
     onDismiss: () -> Unit,
     onAddTask: (TaskType) -> Unit,
     onSetResetHour: () -> Unit,
-    onSetResetDayOfWeek: () -> Unit,
+    onSetWeeklyReset: () -> Unit,
     onRemove: () -> Unit,
 ) {
     DropdownMenu(
@@ -548,16 +548,16 @@ private fun GroupContextMenu(
             onClick = { onAddTask(TaskType.WEEKLY) },
         )
         GroupMenuItem(
-            label = "日課リセット時刻: $resetHour:00",
+            label = "日課リセット設定",
             icon = Icons.Rounded.Refresh,
             iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
             onClick = onSetResetHour,
         )
         GroupMenuItem(
-            label = "週課リセット曜日: ${dayOfWeekLabel(resetDayOfWeek)}",
+            label = "週課リセット設定",
             icon = Icons.Rounded.DateRange,
             iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
-            onClick = onSetResetDayOfWeek,
+            onClick = onSetWeeklyReset,
         )
         GroupMenuItem(
             label = "削除",
@@ -610,13 +610,12 @@ private fun GroupCardBody(
         val sections = TaskType.entries
             .map { type -> type to tasks.filter { it.type == type } }
             .filter { (_, sectionTasks) -> sectionTasks.isNotEmpty() }
-        // 単一種別のみのグループはヘッダーを出さず従来通りの見た目にする
-        val showHeaders = sections.size > 1
         Column(modifier = Modifier.padding(top = 4.dp)) {
             sections.forEach { (type, sectionTasks) ->
-                if (showHeaders) {
-                    TaskSectionHeader(title = type.label)
-                }
+                TaskSectionHeader(
+                    title = type.label,
+                    detail = group.resetLabel(type),
+                )
                 TaskSection(
                     groupId = group.id,
                     type = type,
@@ -631,13 +630,23 @@ private fun GroupCardBody(
 }
 
 @Composable
-private fun TaskSectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary,
+private fun TaskSectionHeader(title: String, detail: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier.padding(start = 22.dp, top = 8.dp, bottom = 2.dp),
-    )
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text = detail,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable
@@ -893,59 +902,85 @@ private fun ResetHourSelector(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp),
         )
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(RESET_HOUR_GRID_COLUMNS),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.height(RESET_HOUR_GRID_HEIGHT),
-        ) {
-            items(HOURS_IN_DAY) { hour ->
-                val isSelected = hour == selectedHour
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                        )
-                        .clickable { onHourSelected(hour) }
-                        .padding(vertical = 6.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "$hour:00",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isSelected) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
-                }
-            }
+        HourGrid(selectedHour = selectedHour, onHourSelected = onHourSelected)
+    }
+}
+
+@Composable
+private fun HourGrid(
+    selectedHour: Int?,
+    onHourSelected: (Int) -> Unit,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(RESET_HOUR_GRID_COLUMNS),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.height(RESET_HOUR_GRID_HEIGHT),
+    ) {
+        items(HOURS_IN_DAY) { hour ->
+            SelectableCell(
+                text = "$hour:00",
+                isSelected = hour == selectedHour,
+                onClick = { onHourSelected(hour) },
+            )
         }
     }
 }
 
 @Composable
-private fun ResetDayOfWeekDialog(
+private fun SelectableCell(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isSelected) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+        )
+    }
+}
+
+@Composable
+private fun WeeklyResetDialog(
     currentDay: Int,
-    onConfirm: (Int) -> Unit,
+    currentWeeklyHour: Int?,
+    onConfirm: (Int, Int?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var selectedDay by remember { mutableStateOf(currentDay) }
+    // null = 日課と同じ時刻
+    var selectedHour by remember { mutableStateOf(currentWeeklyHour) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("週課リセット曜日") },
+        title = { Text("週課リセット設定") },
         text = {
-            ResetDayOfWeekSelector(
+            WeeklyResetSelector(
                 selectedDay = selectedDay,
+                selectedHour = selectedHour,
                 onDaySelected = { selectedDay = it },
+                onHourSelected = { selectedHour = it },
             )
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(selectedDay) },
+                onClick = { onConfirm(selectedDay, selectedHour) },
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(12.dp),
             ) {
@@ -962,47 +997,55 @@ private fun ResetDayOfWeekDialog(
 }
 
 @Composable
-private fun ResetDayOfWeekSelector(
+private fun WeeklyResetSelector(
     selectedDay: Int,
+    selectedHour: Int?,
     onDaySelected: (Int) -> Unit,
+    onHourSelected: (Int?) -> Unit,
 ) {
-    Column {
+    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
         Text(
-            text = "${dayOfWeekLabel(selectedDay)}にリセット",
+            text = "リセット曜日: ${dayOfWeekLabel(selectedDay)}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp),
         )
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(RESET_DAY_GRID_COLUMNS),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.height(RESET_DAY_GRID_HEIGHT),
-        ) {
-            items(DAYS_IN_WEEK) { index ->
-                val isoDay = index + 1
-                val isSelected = isoDay == selectedDay
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                        )
-                        .clickable { onDaySelected(isoDay) }
-                        .padding(vertical = 6.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = dayOfWeekLabel(isoDay),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isSelected) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
-                }
-            }
+        DayOfWeekGrid(selectedDay = selectedDay, onDaySelected = onDaySelected)
+        Text(
+            text = if (selectedHour != null) "リセット時刻: $selectedHour:00" else "リセット時刻: 日課と同じ",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+        )
+        SelectableCell(
+            text = "日課と同じ時刻",
+            isSelected = selectedHour == null,
+            onClick = { onHourSelected(null) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        HourGrid(selectedHour = selectedHour, onHourSelected = onHourSelected)
+    }
+}
+
+@Composable
+private fun DayOfWeekGrid(
+    selectedDay: Int,
+    onDaySelected: (Int) -> Unit,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(RESET_DAY_GRID_COLUMNS),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.height(RESET_DAY_GRID_HEIGHT),
+    ) {
+        items(DAYS_IN_WEEK) { index ->
+            val isoDay = index + 1
+            SelectableCell(
+                text = dayOfWeekLabel(isoDay),
+                isSelected = isoDay == selectedDay,
+                onClick = { onDaySelected(isoDay) },
+            )
         }
     }
 }
@@ -1012,6 +1055,12 @@ private val TaskType.label: String
         TaskType.DAILY -> "日課"
         TaskType.WEEKLY -> "週課"
     }
+
+/** セクションヘッダーに表示するリセット時刻/曜日のラベル */
+private fun TaskGroup.resetLabel(type: TaskType): String = when (type) {
+    TaskType.DAILY -> "$resetHour:00 リセット"
+    TaskType.WEEKLY -> "${dayOfWeekLabel(resetDayOfWeek)} ${effectiveWeeklyResetHour()}:00 リセット"
+}
 
 // ISO 8601 の曜日番号 (1=月曜) 順
 private val DAY_OF_WEEK_LABELS = listOf("月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜")

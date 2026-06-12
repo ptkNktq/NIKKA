@@ -33,7 +33,7 @@ data class HomeUiState(
     val addTaskTargetType: TaskType = TaskType.DAILY,
     val deleteGroupConfirmId: String? = null,
     val resetHourTargetGroupId: String? = null,
-    val resetDayOfWeekTargetGroupId: String? = null,
+    val weeklyResetTargetGroupId: String? = null,
     val isLoading: Boolean = true,
 )
 
@@ -330,10 +330,16 @@ class HomeViewModel(
                     if (group.id != groupId) {
                         group
                     } else {
-                        // 変更時点までのリセット予定は実施済み扱いにして、当日の進捗を消さない
+                        // 変更時点までのリセット予定は実施済み扱いにして、当日の進捗を消さない。
+                        // 週課が「日課と同じ時刻」設定の場合はリセット時刻が連動するため、週次側も同様に扱う
                         val configured = group.copy(resetHour = hour)
                         configured.copy(
                             lastResetDate = configured.latestDailyResetDate(now.date, now.hour),
+                            lastWeeklyResetDate = if (configured.weeklyResetHour == null) {
+                                configured.latestWeeklyResetDate(now.date, now.hour)
+                            } else {
+                                configured.lastWeeklyResetDate
+                            },
                         )
                     }
                 },
@@ -343,15 +349,15 @@ class HomeViewModel(
         persistAll()
     }
 
-    fun showResetDayOfWeekDialog(groupId: String) {
-        _uiState.update { it.copy(resetDayOfWeekTargetGroupId = groupId) }
+    fun showWeeklyResetDialog(groupId: String) {
+        _uiState.update { it.copy(weeklyResetTargetGroupId = groupId) }
     }
 
-    fun dismissResetDayOfWeekDialog() {
-        _uiState.update { it.copy(resetDayOfWeekTargetGroupId = null) }
+    fun dismissWeeklyResetDialog() {
+        _uiState.update { it.copy(weeklyResetTargetGroupId = null) }
     }
 
-    fun setResetDayOfWeek(groupId: String, isoDayOfWeek: Int) {
+    fun setWeeklyReset(groupId: String, isoDayOfWeek: Int, weeklyResetHour: Int?) {
         val now = clock.now().toLocalDateTime(timeZone)
         _uiState.update { state ->
             state.copy(
@@ -360,13 +366,16 @@ class HomeViewModel(
                         group
                     } else {
                         // 設定時点の週課の進捗を消さないよう、直近のリセット予定日を実施済み扱いにする
-                        val configured = group.copy(resetDayOfWeek = isoDayOfWeek)
+                        val configured = group.copy(
+                            resetDayOfWeek = isoDayOfWeek,
+                            weeklyResetHour = weeklyResetHour,
+                        )
                         configured.copy(
                             lastWeeklyResetDate = configured.latestWeeklyResetDate(now.date, now.hour),
                         )
                     }
                 },
-                resetDayOfWeekTargetGroupId = null,
+                weeklyResetTargetGroupId = null,
             )
         }
         persistAll()
