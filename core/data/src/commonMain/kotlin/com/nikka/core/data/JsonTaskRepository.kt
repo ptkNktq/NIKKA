@@ -1,5 +1,6 @@
 package com.nikka.core.data
 
+import com.nikka.core.model.AppSettings
 import com.nikka.core.model.NotificationSettings
 import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
@@ -32,10 +33,18 @@ class JsonTaskRepository(
     }
     private val mutex = Mutex()
 
-    private val _notificationSettings: MutableStateFlow<NotificationSettings> =
+    private val _notificationSettings: MutableStateFlow<NotificationSettings>
+    private val _appSettings: MutableStateFlow<AppSettings>
+
+    init {
         // コンストラクタで初期値をロード完了させ、VM / Scheduler 初期化との race を排除する。
-        MutableStateFlow(runBlocking { load().notificationSettings })
+        val initial = runBlocking { load() }
+        _notificationSettings = MutableStateFlow(initial.notificationSettings)
+        _appSettings = MutableStateFlow(initial.appSettings)
+    }
+
     override val notificationSettings: StateFlow<NotificationSettings> = _notificationSettings.asStateFlow()
+    override val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
 
     override suspend fun loadGroups(): List<TaskGroup> = load().groups
 
@@ -54,6 +63,15 @@ class JsonTaskRepository(
             writeFile(current.copy(notificationSettings = settings))
             // ファイル書き込み成功と StateFlow 更新を原子的に扱う
             _notificationSettings.value = settings
+        }
+    }
+
+    override suspend fun saveAppSettings(settings: AppSettings) {
+        mutex.withLock {
+            val current = readFile()
+            writeFile(current.copy(appSettings = settings))
+            // ファイル書き込み成功と StateFlow 更新を原子的に扱う
+            _appSettings.value = settings
         }
     }
 

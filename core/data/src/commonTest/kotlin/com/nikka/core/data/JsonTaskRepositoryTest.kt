@@ -1,5 +1,6 @@
 package com.nikka.core.data
 
+import com.nikka.core.model.AppSettings
 import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
 import kotlinx.coroutines.test.runTest
@@ -119,6 +120,16 @@ class JsonTaskRepositoryTest {
 
         assertEquals(emptyList(), repository.loadGroups())
         assertEquals(emptyList(), repository.loadTasks())
+    }
+
+    @Test
+    fun `appSettings round trip`() = runTest {
+        repository.saveAppSettings(AppSettings(collapseOnDailyCompleted = true))
+        assertTrue(repository.appSettings.value.collapseOnDailyCompleted)
+
+        // 新しいインスタンスで読み直しても保持される
+        val reloaded = JsonTaskRepository(filePath)
+        assertTrue(reloaded.appSettings.value.collapseOnDailyCompleted)
     }
 
     @Test

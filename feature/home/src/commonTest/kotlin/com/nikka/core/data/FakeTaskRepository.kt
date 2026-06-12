@@ -1,5 +1,6 @@
 package com.nikka.core.data
 
+import com.nikka.core.model.AppSettings
 import com.nikka.core.model.NotificationSettings
 import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
@@ -17,6 +18,9 @@ class FakeTaskRepository : TaskRepository {
     private val _notificationSettings = MutableStateFlow(NotificationSettings())
     override val notificationSettings: StateFlow<NotificationSettings> = _notificationSettings.asStateFlow()
 
+    private val _appSettings = MutableStateFlow(AppSettings())
+    override val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
+
     override suspend fun loadGroups(): List<TaskGroup> = groups.toList()
     override suspend fun loadTasks(): List<Task> = tasks.toList()
     override suspend fun saveAll(groups: List<TaskGroup>, tasks: List<Task>) {
@@ -26,6 +30,10 @@ class FakeTaskRepository : TaskRepository {
 
     override suspend fun saveNotificationSettings(settings: NotificationSettings) {
         _notificationSettings.value = settings
+    }
+
+    override suspend fun saveAppSettings(settings: AppSettings) {
+        _appSettings.value = settings
     }
 
     override suspend fun loadLastNotifiedDate(): LocalDate? = lastNotifiedDate

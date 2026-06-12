@@ -1,5 +1,6 @@
 package com.nikka.core.data
 
+import com.nikka.core.model.AppSettings
 import com.nikka.core.model.NotificationSettings
 import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
@@ -8,12 +9,14 @@ import kotlinx.datetime.LocalDate
 
 interface TaskRepository {
     val notificationSettings: StateFlow<NotificationSettings>
+    val appSettings: StateFlow<AppSettings>
 
     suspend fun loadGroups(): List<TaskGroup>
     suspend fun loadTasks(): List<Task>
     suspend fun saveAll(groups: List<TaskGroup>, tasks: List<Task>)
 
     suspend fun saveNotificationSettings(settings: NotificationSettings)
+    suspend fun saveAppSettings(settings: AppSettings)
 
     suspend fun loadLastNotifiedDate(): LocalDate?
     suspend fun saveLastNotifiedDate(date: LocalDate)
