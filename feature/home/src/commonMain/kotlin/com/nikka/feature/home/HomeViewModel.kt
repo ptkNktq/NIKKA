@@ -14,6 +14,8 @@ import com.nikka.core.model.withWeeklyResetBaseline
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -56,19 +58,23 @@ class HomeViewModel(
     init {
         loadData()
         viewModelScope.launch {
-            repository.appSettings.collect { settings ->
-                _uiState.update { state ->
-                    state.copy(
-                        collapseOnDailyCompleted = settings.collapseOnDailyCompleted,
-                        // 完了判定の基準が変わるため、自動折りたたみ状態も再評価する (ロード完了前は対象なし)
-                        collapsedGroupIds = if (state.isLoading) {
-                            state.collapsedGroupIds
-                        } else {
-                            autoCollapsedGroupIds(state.groups, state.tasks, settings.collapseOnDailyCompleted)
-                        },
-                    )
+            // 無関係な設定の保存で手動の折りたたみ状態が破棄されないよう、対象フィールドの変化だけ拾う
+            repository.appSettings
+                .map { it.collapseOnDailyCompleted }
+                .distinctUntilChanged()
+                .collect { collapseOnDailyCompleted ->
+                    _uiState.update { state ->
+                        state.copy(
+                            collapseOnDailyCompleted = collapseOnDailyCompleted,
+                            // 完了判定の基準が変わるため、自動折りたたみ状態も再評価する (ロード完了前は対象なし)
+                            collapsedGroupIds = if (state.isLoading) {
+                                state.collapsedGroupIds
+                            } else {
+                                autoCollapsedGroupIds(state.groups, state.tasks, collapseOnDailyCompleted)
+                            },
+                        )
+                    }
                 }
-            }
         }
     }
 
