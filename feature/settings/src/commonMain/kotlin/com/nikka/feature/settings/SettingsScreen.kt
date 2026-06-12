@@ -58,9 +58,9 @@ fun SettingsScreen(
             icon = Icons.Rounded.UnfoldLess,
             title = "日課完了でグループを折りたたむ",
             subtitle = if (appSettings.collapseOnDailyCompleted) {
-                "ON / 週課が未達成でも、日課がすべて完了していれば折りたたむ"
+                "ON / 週課が未達成でも、日課がすべて完了していれば折りたたみ・完了表示 (緑) にする"
             } else {
-                "OFF / 週課を含むすべてのタスクが完了したら折りたたむ"
+                "OFF / 週課を含むすべてのタスクが完了したら折りたたみ・完了表示 (緑) にする"
             },
             checked = appSettings.collapseOnDailyCompleted,
             onCheckedChange = { checked ->

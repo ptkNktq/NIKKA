@@ -6,6 +6,7 @@ import com.nikka.core.data.TaskRepository
 import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
 import com.nikka.core.model.TaskType
+import com.nikka.core.model.allTasksCompleted
 import com.nikka.core.model.isDailyResetPending
 import com.nikka.core.model.latestDailyResetDate
 import com.nikka.core.model.latestWeeklyResetDate
@@ -34,6 +35,8 @@ data class HomeUiState(
     val deleteGroupConfirmId: String? = null,
     val resetHourTargetGroupId: String? = null,
     val weeklyResetTargetGroupId: String? = null,
+    /** 週課が未達成でも日課完了でグループを完了扱い (折りたたみ・ステータス表示) にするか */
+    val collapseOnDailyCompleted: Boolean = false,
     val isLoading: Boolean = true,
 )
 
@@ -52,6 +55,11 @@ class HomeViewModel(
 
     init {
         loadData()
+        viewModelScope.launch {
+            repository.appSettings.collect { settings ->
+                _uiState.update { it.copy(collapseOnDailyCompleted = settings.collapseOnDailyCompleted) }
+            }
+        }
     }
 
     private data class AutoResetResult(
@@ -379,19 +387,9 @@ class HomeViewModel(
         persistAll()
     }
 
-    /**
-     * グループを自動で折りたたむべきか。
-     * 「日課完了で折りたたむ」設定が ON の場合は日課のみで判定する
-     * (日課が 1 つもないグループは従来通り全タスクで判定)。
-     */
-    private fun shouldAutoCollapse(groupTasks: List<Task>): Boolean {
-        val targets = if (repository.appSettings.value.collapseOnDailyCompleted) {
-            groupTasks.filter { it.type == TaskType.DAILY }.ifEmpty { groupTasks }
-        } else {
-            groupTasks
-        }
-        return targets.isNotEmpty() && targets.all { it.isCompleted }
-    }
+    /** グループを自動で折りたたむべきか。「日課完了で折りたたむ」設定に従う */
+    private fun shouldAutoCollapse(groupTasks: List<Task>): Boolean =
+        groupTasks.allTasksCompleted(dailyOnly = repository.appSettings.value.collapseOnDailyCompleted)
 
     private fun persistAll() {
         val snapshot = _uiState.value

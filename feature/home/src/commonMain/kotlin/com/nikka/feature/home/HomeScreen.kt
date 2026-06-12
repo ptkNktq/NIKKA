@@ -84,6 +84,7 @@ import androidx.compose.ui.unit.dp
 import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
 import com.nikka.core.model.TaskType
+import com.nikka.core.model.allTasksCompleted
 import com.nikka.core.model.effectiveWeeklyResetHour
 import com.nikka.core.ui.component.ProvideTopBarActions
 import com.nikka.core.ui.theme.StatusGreen
@@ -177,6 +178,7 @@ private fun HomeContent(
                         group = group,
                         tasks = uiState.tasks.filter { it.groupId == group.id },
                         isCollapsed = group.id in uiState.collapsedGroupIds,
+                        dailyOnlyCompletion = uiState.collapseOnDailyCompleted,
                         actions = GroupCardActions(
                             onToggleCollapse = { onToggleGroupCollapse(group.id) },
                             onToggleTask = onToggleTask,
@@ -333,10 +335,12 @@ private fun GroupCard(
     group: TaskGroup,
     tasks: List<Task>,
     isCollapsed: Boolean,
+    dailyOnlyCompletion: Boolean,
     actions: GroupCardActions,
     dragModifier: Modifier = Modifier,
 ) {
-    val allCompleted = tasks.isNotEmpty() && tasks.all { it.isCompleted }
+    // ステータスドットの完了判定は自動折りたたみと同じ基準に揃える
+    val allCompleted = tasks.allTasksCompleted(dailyOnly = dailyOnlyCompletion)
 
     Column(
         modifier = modifier
