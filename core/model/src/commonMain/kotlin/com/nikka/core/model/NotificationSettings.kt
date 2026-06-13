@@ -6,11 +6,11 @@ import kotlinx.serialization.Serializable
 data class NotificationSettings(
     val enabled: Boolean = false,
     val webhookUrl: String = "",
-    val message: String? = null,
     val hour: Int = DEFAULT_HOUR,
+    /** 通知メッセージの先頭に付ける文言 (メンション等)。null で付けない */
+    val messagePrefix: String? = null,
 ) {
     companion object {
         const val DEFAULT_HOUR = 21
-        const val DEFAULT_MESSAGE = "本日の日課に未達成の項目があります。"
     }
 }

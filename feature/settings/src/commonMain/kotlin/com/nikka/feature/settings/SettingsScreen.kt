@@ -16,9 +16,11 @@ import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.UnfoldLess
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -30,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.nikka.core.data.TaskRepository
 import com.nikka.core.model.NotificationSettings
 import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 import java.awt.Desktop
 import java.net.URI
 
@@ -38,8 +41,10 @@ fun SettingsScreen(
     onNavigateToNotification: () -> Unit,
     onNavigateToLicense: () -> Unit,
     repository: TaskRepository = koinInject(),
+    appSettingsViewModel: AppSettingsViewModel = koinViewModel(),
 ) {
     val notificationSettings by repository.notificationSettings.collectAsState()
+    val appSettings by appSettingsViewModel.appSettings.collectAsState()
 
     Column(
         modifier = Modifier
@@ -47,6 +52,19 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(vertical = 8.dp),
     ) {
+        SectionDivider(title = "表示", showDivider = false)
+        SettingsToggleItem(
+            icon = Icons.Rounded.UnfoldLess,
+            title = "日課完了でグループを折りたたむ",
+            subtitle = if (appSettings.collapseOnDailyCompleted) {
+                "ON / 週課が未達成でも、日課がすべて完了していれば折りたたみ・完了表示 (緑) にする"
+            } else {
+                "OFF / 週課を含むすべてのタスクが完了したら折りたたみ・完了表示 (緑) にする"
+            },
+            checked = appSettings.collapseOnDailyCompleted,
+            onCheckedChange = appSettingsViewModel::setCollapseOnDailyCompleted,
+        )
+
         SectionDivider(title = "通知")
         SettingsItem(
             icon = Icons.Rounded.Notifications,
@@ -82,18 +100,54 @@ private fun notificationSubtitle(settings: NotificationSettings): String =
     if (settings.enabled) "ON / ${settings.hour}:00" else "OFF"
 
 @Composable
-private fun SectionDivider(title: String) {
+private fun SectionDivider(title: String, showDivider: Boolean = true) {
     Column {
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
+        // 先頭セクションは区切り線を出さない
+        if (showDivider) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+        }
         Text(
             text = title,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 4.dp),
         )
+    }
+}
+
+@Composable
+private fun SettingsToggleItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

@@ -69,7 +69,7 @@ fun NotificationSettingsScreen(
             testSendStatus = state.testSendStatus,
             testSendError = state.testSendError,
             onWebhookUrlChange = viewModel::setWebhookUrl,
-            onMessageChange = viewModel::setMessage,
+            onMessagePrefixChange = viewModel::setMessagePrefix,
             onHourClick = viewModel::showHourDialog,
             onTestSendClick = viewModel::sendTestMessage,
         )
@@ -93,7 +93,7 @@ private fun NotificationFields(
     testSendStatus: TestSendStatus,
     testSendError: String?,
     onWebhookUrlChange: (String) -> Unit,
-    onMessageChange: (String) -> Unit,
+    onMessagePrefixChange: (String) -> Unit,
     onHourClick: () -> Unit,
     onTestSendClick: () -> Unit,
 ) {
@@ -107,11 +107,11 @@ private fun NotificationFields(
         enabled = settings.enabled,
     )
     OutlinedTextField(
-        value = settings.message.orEmpty(),
-        onValueChange = onMessageChange,
+        value = settings.messagePrefix.orEmpty(),
+        onValueChange = onMessagePrefixChange,
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-        label = { Text("メッセージ") },
-        placeholder = { Text("未入力時はデフォルト文言で送信") },
+        label = { Text("メッセージプレフィックス") },
+        placeholder = { Text("通知の先頭に付ける文言 (メンション等)。未入力なら付けない") },
         maxLines = 4,
         enabled = settings.enabled,
     )
@@ -198,7 +198,7 @@ private fun NotificationToggleRow(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                text = "指定時刻に未達成の日課があれば Discord に通知します",
+                text = "指定時刻に未達成の日課があれば Discord に通知します。週課はリセット曜日の前日に通知します",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

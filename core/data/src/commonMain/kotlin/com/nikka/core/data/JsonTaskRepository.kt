@@ -1,7 +1,8 @@
 package com.nikka.core.data
 
-import com.nikka.core.model.DailyTask
+import com.nikka.core.model.AppSettings
 import com.nikka.core.model.NotificationSettings
+import com.nikka.core.model.Task
 import com.nikka.core.model.TaskGroup
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,16 +33,24 @@ class JsonTaskRepository(
     }
     private val mutex = Mutex()
 
-    private val _notificationSettings: MutableStateFlow<NotificationSettings> =
+    private val _notificationSettings: MutableStateFlow<NotificationSettings>
+    private val _appSettings: MutableStateFlow<AppSettings>
+
+    init {
         // コンストラクタで初期値をロード完了させ、VM / Scheduler 初期化との race を排除する。
-        MutableStateFlow(runBlocking { load().notificationSettings })
+        val initial = runBlocking { load() }
+        _notificationSettings = MutableStateFlow(initial.notificationSettings)
+        _appSettings = MutableStateFlow(initial.appSettings)
+    }
+
     override val notificationSettings: StateFlow<NotificationSettings> = _notificationSettings.asStateFlow()
+    override val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
 
     override suspend fun loadGroups(): List<TaskGroup> = load().groups
 
-    override suspend fun loadTasks(): List<DailyTask> = load().tasks
+    override suspend fun loadTasks(): List<Task> = load().tasks
 
-    override suspend fun saveAll(groups: List<TaskGroup>, tasks: List<DailyTask>) {
+    override suspend fun saveAll(groups: List<TaskGroup>, tasks: List<Task>) {
         mutex.withLock {
             val current = readFile()
             writeFile(current.copy(groups = groups, tasks = tasks))
@@ -57,12 +66,30 @@ class JsonTaskRepository(
         }
     }
 
+    override suspend fun saveAppSettings(settings: AppSettings) {
+        mutex.withLock {
+            val current = readFile()
+            writeFile(current.copy(appSettings = settings))
+            // ファイル書き込み成功と StateFlow 更新を原子的に扱う
+            _appSettings.value = settings
+        }
+    }
+
     override suspend fun loadLastNotifiedDate(): LocalDate? = load().lastNotifiedDate
 
     override suspend fun saveLastNotifiedDate(date: LocalDate) {
         mutex.withLock {
             val current = readFile()
             writeFile(current.copy(lastNotifiedDate = date))
+        }
+    }
+
+    override suspend fun loadLastWeeklyNotifiedDate(): LocalDate? = load().lastWeeklyNotifiedDate
+
+    override suspend fun saveLastWeeklyNotifiedDate(date: LocalDate) {
+        mutex.withLock {
+            val current = readFile()
+            writeFile(current.copy(lastWeeklyNotifiedDate = date))
         }
     }
 
@@ -90,12 +117,13 @@ class JsonTaskRepository(
                 TaskGroup(
                     id = obj["id"]!!.jsonPrimitive.content,
                     name = obj["name"]!!.jsonPrimitive.content,
-                    resetHour = obj["resetHour"]?.jsonPrimitive?.content?.toIntOrNull(),
+                    resetHour = obj["resetHour"]?.jsonPrimitive?.content?.toIntOrNull()
+                        ?: TaskGroup.DEFAULT_RESET_HOUR,
                     lastResetDate = lastResetStr?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
                 )
             } ?: emptyList()
             val tasks = root["tasks"]?.jsonArray?.map { elem ->
-                json.decodeFromJsonElement(DailyTask.serializer(), elem)
+                json.decodeFromJsonElement(Task.serializer(), elem)
             } ?: emptyList()
             NikkaData(groups = groups, tasks = tasks)
         } catch (_: Exception) {

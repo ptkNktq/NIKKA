@@ -5,6 +5,7 @@ import com.nikka.core.data.NotificationScheduler
 import com.nikka.core.data.TaskRepository
 import com.nikka.core.data.createDiscordWebhookClient
 import com.nikka.feature.home.HomeViewModel
+import com.nikka.feature.settings.AppSettingsViewModel
 import com.nikka.feature.settings.NotificationSettingsViewModel
 import kotlinx.datetime.Clock
 import org.koin.core.module.dsl.viewModel
@@ -17,4 +18,5 @@ val appModule = module {
     single { NotificationScheduler(get(), get(), get()) }
     viewModel { HomeViewModel(get(), get()) }
     viewModel { NotificationSettingsViewModel(get(), get(), get()) }
+    viewModel { AppSettingsViewModel(get()) }
 }
