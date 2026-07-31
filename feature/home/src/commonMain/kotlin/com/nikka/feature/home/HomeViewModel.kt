@@ -241,20 +241,7 @@ class HomeViewModel(
             val newTasks = state.tasks.map { task ->
                 if (task.id == taskId) task.copy(type = newType) else task
             }
-            // 種別変更でグループが完了状態になったら、toggleTask と同様に自動で折りたたむ
-            val collapseGroupId = state.tasks.find { it.id == taskId }?.groupId?.takeIf { groupId ->
-                newTasks
-                    .filter { it.groupId == groupId }
-                    .allTasksCompleted(dailyOnly = repository.appSettings.value.collapseOnDailyCompleted)
-            }
-            state.copy(
-                tasks = newTasks,
-                collapsedGroupIds = if (collapseGroupId != null) {
-                    state.collapsedGroupIds + collapseGroupId
-                } else {
-                    state.collapsedGroupIds
-                },
-            )
+            state.withTasksAndAutoCollapse(taskId, newTasks, repository.appSettings.value.collapseOnDailyCompleted)
         }
         persistAll()
     }
@@ -264,20 +251,7 @@ class HomeViewModel(
             val newTasks = state.tasks.map { task ->
                 if (task.id == taskId) task.copy(isCompleted = !task.isCompleted) else task
             }
-            // トグルしたタスクのグループが完了状態になったら自動で折りたたむ
-            val collapseGroupId = state.tasks.find { it.id == taskId }?.groupId?.takeIf { groupId ->
-                newTasks
-                    .filter { it.groupId == groupId }
-                    .allTasksCompleted(dailyOnly = repository.appSettings.value.collapseOnDailyCompleted)
-            }
-            state.copy(
-                tasks = newTasks,
-                collapsedGroupIds = if (collapseGroupId != null) {
-                    state.collapsedGroupIds + collapseGroupId
-                } else {
-                    state.collapsedGroupIds
-                },
-            )
+            state.withTasksAndAutoCollapse(taskId, newTasks, repository.appSettings.value.collapseOnDailyCompleted)
         }
         persistAll()
     }
@@ -460,3 +434,22 @@ private fun autoCollapsedGroupIds(
 ): Set<String> = groups.map { it.id }.filter { groupId ->
     tasks.filter { it.groupId == groupId }.allTasksCompleted(dailyOnly = dailyOnly)
 }.toSet()
+
+/** [newTasks] を適用し、[taskId] のグループが完了状態になっていれば自動で折りたたむ */
+private fun HomeUiState.withTasksAndAutoCollapse(
+    taskId: String,
+    newTasks: List<Task>,
+    dailyOnly: Boolean,
+): HomeUiState {
+    val collapseGroupId = tasks.find { it.id == taskId }?.groupId?.takeIf { groupId ->
+        newTasks.filter { it.groupId == groupId }.allTasksCompleted(dailyOnly = dailyOnly)
+    }
+    return copy(
+        tasks = newTasks,
+        collapsedGroupIds = if (collapseGroupId != null) {
+            collapsedGroupIds + collapseGroupId
+        } else {
+            collapsedGroupIds
+        },
+    )
+}
