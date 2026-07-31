@@ -167,7 +167,8 @@ class HomeViewModel(
         val changedGroupIds = mutableSetOf<String>()
         val newTasks = tasks.map { task ->
             val shouldReset = when (task.type) {
-                TaskType.DAILY -> task.groupId in dailyResetGroupIds
+                // 任意項目は日課と同じタイミングでリセットする
+                TaskType.DAILY, TaskType.OPTIONAL -> task.groupId in dailyResetGroupIds
                 TaskType.WEEKLY -> task.groupId in weeklyResetDates
             }
             if (shouldReset && task.isCompleted) {
@@ -234,25 +235,23 @@ class HomeViewModel(
         persistAll()
     }
 
+    /** 日課 <-> 任意項目の種別変更。それ以外の種別間の変更は想定していない */
+    fun changeTaskType(taskId: String, newType: TaskType) {
+        _uiState.update { state ->
+            val newTasks = state.tasks.map { task ->
+                if (task.id == taskId) task.copy(type = newType) else task
+            }
+            state.withTasksAndAutoCollapse(taskId, newTasks, repository.appSettings.value.collapseOnDailyCompleted)
+        }
+        persistAll()
+    }
+
     fun toggleTask(taskId: String) {
         _uiState.update { state ->
             val newTasks = state.tasks.map { task ->
                 if (task.id == taskId) task.copy(isCompleted = !task.isCompleted) else task
             }
-            // トグルしたタスクのグループが完了状態になったら自動で折りたたむ
-            val collapseGroupId = state.tasks.find { it.id == taskId }?.groupId?.takeIf { groupId ->
-                newTasks
-                    .filter { it.groupId == groupId }
-                    .allTasksCompleted(dailyOnly = repository.appSettings.value.collapseOnDailyCompleted)
-            }
-            state.copy(
-                tasks = newTasks,
-                collapsedGroupIds = if (collapseGroupId != null) {
-                    state.collapsedGroupIds + collapseGroupId
-                } else {
-                    state.collapsedGroupIds
-                },
-            )
+            state.withTasksAndAutoCollapse(taskId, newTasks, repository.appSettings.value.collapseOnDailyCompleted)
         }
         persistAll()
     }
@@ -419,19 +418,38 @@ class HomeViewModel(
         persistAll()
     }
 
-    /** 自動折りたたみ対象 (「日課完了で折りたたむ」設定に応じた完了済みグループ) を返す */
-    private fun autoCollapsedGroupIds(
-        groups: List<TaskGroup>,
-        tasks: List<Task>,
-        dailyOnly: Boolean,
-    ): Set<String> = groups.map { it.id }.filter { groupId ->
-        tasks.filter { it.groupId == groupId }.allTasksCompleted(dailyOnly = dailyOnly)
-    }.toSet()
-
     private fun persistAll() {
         val snapshot = _uiState.value
         viewModelScope.launch {
             repository.saveAll(snapshot.groups, snapshot.tasks)
         }
     }
+}
+
+/** 自動折りたたみ対象 (「日課完了で折りたたむ」設定に応じた完了済みグループ) を返す */
+private fun autoCollapsedGroupIds(
+    groups: List<TaskGroup>,
+    tasks: List<Task>,
+    dailyOnly: Boolean,
+): Set<String> = groups.map { it.id }.filter { groupId ->
+    tasks.filter { it.groupId == groupId }.allTasksCompleted(dailyOnly = dailyOnly)
+}.toSet()
+
+/** [newTasks] を適用し、[taskId] のグループが完了状態になっていれば自動で折りたたむ */
+private fun HomeUiState.withTasksAndAutoCollapse(
+    taskId: String,
+    newTasks: List<Task>,
+    dailyOnly: Boolean,
+): HomeUiState {
+    val collapseGroupId = tasks.find { it.id == taskId }?.groupId?.takeIf { groupId ->
+        newTasks.filter { it.groupId == groupId }.allTasksCompleted(dailyOnly = dailyOnly)
+    }
+    return copy(
+        tasks = newTasks,
+        collapsedGroupIds = if (collapseGroupId != null) {
+            collapsedGroupIds + collapseGroupId
+        } else {
+            collapsedGroupIds
+        },
+    )
 }

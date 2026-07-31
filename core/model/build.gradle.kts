@@ -9,5 +9,9 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             api(libs.kotlinx.datetime)
         }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
     }
 }

@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.CompareArrows
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DateRange
@@ -79,6 +80,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.nikka.core.model.Task
@@ -116,6 +118,7 @@ fun HomeScreen(
             onToggleTask = viewModel::toggleTask,
             onShowAddTask = viewModel::showAddTaskDialog,
             onRemoveTask = viewModel::removeTask,
+            onChangeTaskType = viewModel::changeTaskType,
             onRemoveGroup = viewModel::showDeleteGroupConfirm,
             onToggleGroupCollapse = viewModel::toggleGroupCollapse,
             onResetGroup = viewModel::resetGroupTasks,
@@ -148,6 +151,7 @@ private fun HomeContent(
     onToggleTask: (String) -> Unit,
     onShowAddTask: (String, TaskType) -> Unit,
     onRemoveTask: (String) -> Unit,
+    onChangeTaskType: (String, TaskType) -> Unit,
     onRemoveGroup: (String) -> Unit,
     onToggleGroupCollapse: (String) -> Unit,
     onResetGroup: (String) -> Unit,
@@ -184,6 +188,7 @@ private fun HomeContent(
                             onToggleTask = onToggleTask,
                             onAddTask = { type -> onShowAddTask(group.id, type) },
                             onRemoveTask = onRemoveTask,
+                            onChangeTaskType = onChangeTaskType,
                             onRemoveGroup = { onRemoveGroup(group.id) },
                             onResetGroup = { onResetGroup(group.id) },
                             onSetResetHour = { onSetResetHour(group.id) },
@@ -220,6 +225,7 @@ private fun HomeDialogs(uiState: HomeUiState, viewModel: HomeViewModel) {
             placeholder = when (addTaskType) {
                 TaskType.DAILY -> "例: デイリー任務、樹脂消費..."
                 TaskType.WEEKLY -> "例: 週ボス討伐、紀行ミッション..."
+                TaskType.OPTIONAL -> "例: 期間限定イベント、たまの周回..."
             },
             confirmText = "追加",
             onConfirm = { title -> viewModel.addTask(addTaskGroupId, title, addTaskType) },
@@ -322,6 +328,7 @@ private data class GroupCardActions(
     val onToggleTask: (String) -> Unit,
     val onAddTask: (TaskType) -> Unit,
     val onRemoveTask: (String) -> Unit,
+    val onChangeTaskType: (String, TaskType) -> Unit,
     val onRemoveGroup: () -> Unit,
     val onResetGroup: () -> Unit,
     val onSetResetHour: () -> Unit,
@@ -363,6 +370,7 @@ private fun GroupCard(
                 tasks = tasks,
                 onToggleTask = actions.onToggleTask,
                 onRemoveTask = actions.onRemoveTask,
+                onChangeTaskType = actions.onChangeTaskType,
                 onMoveTask = actions.onMoveTask,
             )
         }
@@ -546,6 +554,12 @@ private fun GroupContextMenu(
             onClick = { onAddTask(TaskType.DAILY) },
         )
         GroupMenuItem(
+            label = "任意項目を追加",
+            icon = Icons.Rounded.Add,
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = { onAddTask(TaskType.OPTIONAL) },
+        )
+        GroupMenuItem(
             label = "週課を追加",
             icon = Icons.Rounded.Add,
             iconTint = MaterialTheme.colorScheme.primary,
@@ -601,6 +615,7 @@ private fun GroupCardBody(
     tasks: List<Task>,
     onToggleTask: (String) -> Unit,
     onRemoveTask: (String) -> Unit,
+    onChangeTaskType: (String, TaskType) -> Unit,
     onMoveTask: (String, TaskType, Int, Int) -> Unit,
 ) {
     if (tasks.isEmpty()) {
@@ -626,6 +641,7 @@ private fun GroupCardBody(
                     tasks = sectionTasks,
                     onToggleTask = onToggleTask,
                     onRemoveTask = onRemoveTask,
+                    onChangeTaskType = onChangeTaskType,
                     onMoveTask = onMoveTask,
                 )
             }
@@ -660,6 +676,7 @@ private fun TaskSection(
     tasks: List<Task>,
     onToggleTask: (String) -> Unit,
     onRemoveTask: (String) -> Unit,
+    onChangeTaskType: (String, TaskType) -> Unit,
     onMoveTask: (String, TaskType, Int, Int) -> Unit,
 ) {
     ReorderableColumn(
@@ -674,11 +691,41 @@ private fun TaskSection(
                     task = task,
                     onToggle = { onToggleTask(task.id) },
                     onRemove = { onRemoveTask(task.id) },
+                    onChangeType = { newType -> onChangeTaskType(task.id, newType) },
                     dragModifier = Modifier.draggableHandle(),
                 )
             }
         }
     }
+}
+
+/** 行内での右クリック位置をコンテキストメニューのオフセットとして受け取るための Modifier */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun secondaryClickOffsetModifier(rowHeight: Dp, onSecondaryClick: (DpOffset) -> Unit): Modifier {
+    var lastPointerPosition by remember { mutableStateOf(Offset.Zero) }
+    val density = LocalDensity.current
+    return Modifier
+        .pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    event.changes.firstOrNull()?.let {
+                        lastPointerPosition = it.position
+                    }
+                }
+            }
+        }
+        .onClick(
+            matcher = PointerMatcher.mouse(PointerButton.Secondary),
+            onClick = {
+                with(density) {
+                    onSecondaryClick(
+                        DpOffset(lastPointerPosition.x.toDp(), lastPointerPosition.y.toDp() - rowHeight),
+                    )
+                }
+            },
+        )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -687,12 +734,11 @@ private fun TaskRow(
     task: Task,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
+    onChangeType: (TaskType) -> Unit,
     dragModifier: Modifier = Modifier,
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
     var contextMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
-    var lastPointerPosition by remember { mutableStateOf(Offset.Zero) }
-    val density = LocalDensity.current
 
     Box {
         Row(
@@ -700,25 +746,9 @@ private fun TaskRow(
                 .fillMaxWidth()
                 .height(TASK_ROW_HEIGHT)
                 .clip(RoundedCornerShape(8.dp))
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                            event.changes.firstOrNull()?.let {
-                                lastPointerPosition = it.position
-                            }
-                        }
-                    }
-                }
-                .onClick(
-                    matcher = PointerMatcher.mouse(PointerButton.Secondary),
-                    onClick = {
-                        with(density) {
-                            contextMenuOffset = DpOffset(
-                                lastPointerPosition.x.toDp(),
-                                lastPointerPosition.y.toDp() - TASK_ROW_HEIGHT,
-                            )
-                        }
+                .then(
+                    secondaryClickOffsetModifier(TASK_ROW_HEIGHT) { offset ->
+                        contextMenuOffset = offset
                         showContextMenu = true
                     },
                 )
@@ -736,7 +766,12 @@ private fun TaskRow(
         TaskContextMenu(
             expanded = showContextMenu,
             offset = contextMenuOffset,
+            currentType = task.type,
             onDismiss = { showContextMenu = false },
+            onChangeType = { newType ->
+                showContextMenu = false
+                onChangeType(newType)
+            },
             onRemove = {
                 showContextMenu = false
                 onRemove()
@@ -775,7 +810,9 @@ private fun RowScope.TaskRowContent(task: Task, onToggle: () -> Unit) {
 private fun TaskContextMenu(
     expanded: Boolean,
     offset: DpOffset = DpOffset.Zero,
+    currentType: TaskType,
     onDismiss: () -> Unit,
+    onChangeType: (TaskType) -> Unit,
     onRemove: () -> Unit,
 ) {
     DropdownMenu(
@@ -785,6 +822,22 @@ private fun TaskContextMenu(
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
     ) {
+        // 日課 <-> 任意項目の切り替えのみ提供する。週課は対象外
+        when (currentType) {
+            TaskType.DAILY -> GroupMenuItem(
+                label = "任意項目に変更",
+                icon = Icons.AutoMirrored.Rounded.CompareArrows,
+                iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = { onChangeType(TaskType.OPTIONAL) },
+            )
+            TaskType.OPTIONAL -> GroupMenuItem(
+                label = "日課に変更",
+                icon = Icons.AutoMirrored.Rounded.CompareArrows,
+                iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = { onChangeType(TaskType.DAILY) },
+            )
+            TaskType.WEEKLY -> Unit
+        }
         DropdownMenuItem(
             text = {
                 Text("削除", color = StatusRed)
@@ -1058,11 +1111,13 @@ private val TaskType.label: String
     get() = when (this) {
         TaskType.DAILY -> "日課"
         TaskType.WEEKLY -> "週課"
+        TaskType.OPTIONAL -> "任意"
     }
 
 /** セクションヘッダーに表示するリセット時刻/曜日のラベル */
 private fun TaskGroup.resetLabel(type: TaskType): String = when (type) {
-    TaskType.DAILY -> "$resetHour:00 リセット"
+    // 任意項目は日課と同じタイミングでリセットされる
+    TaskType.DAILY, TaskType.OPTIONAL -> "$resetHour:00 リセット"
     TaskType.WEEKLY -> "${dayOfWeekLabel(resetDayOfWeek)} ${effectiveWeeklyResetHour()}:00 リセット"
 }
 
