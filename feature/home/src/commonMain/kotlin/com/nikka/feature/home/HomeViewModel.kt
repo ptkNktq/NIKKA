@@ -167,7 +167,8 @@ class HomeViewModel(
         val changedGroupIds = mutableSetOf<String>()
         val newTasks = tasks.map { task ->
             val shouldReset = when (task.type) {
-                TaskType.DAILY -> task.groupId in dailyResetGroupIds
+                // 任意項目は日課と同じタイミングでリセットする
+                TaskType.DAILY, TaskType.OPTIONAL -> task.groupId in dailyResetGroupIds
                 TaskType.WEEKLY -> task.groupId in weeklyResetDates
             }
             if (shouldReset && task.isCompleted) {
@@ -230,6 +231,18 @@ class HomeViewModel(
     fun removeTask(taskId: String) {
         _uiState.update { state ->
             state.copy(tasks = state.tasks.filter { it.id != taskId })
+        }
+        persistAll()
+    }
+
+    /** 日課 <-> 任意項目の種別変更。それ以外の種別間の変更は想定していない */
+    fun changeTaskType(taskId: String, newType: TaskType) {
+        _uiState.update { state ->
+            state.copy(
+                tasks = state.tasks.map { task ->
+                    if (task.id == taskId) task.copy(type = newType) else task
+                },
+            )
         }
         persistAll()
     }
@@ -419,15 +432,6 @@ class HomeViewModel(
         persistAll()
     }
 
-    /** 自動折りたたみ対象 (「日課完了で折りたたむ」設定に応じた完了済みグループ) を返す */
-    private fun autoCollapsedGroupIds(
-        groups: List<TaskGroup>,
-        tasks: List<Task>,
-        dailyOnly: Boolean,
-    ): Set<String> = groups.map { it.id }.filter { groupId ->
-        tasks.filter { it.groupId == groupId }.allTasksCompleted(dailyOnly = dailyOnly)
-    }.toSet()
-
     private fun persistAll() {
         val snapshot = _uiState.value
         viewModelScope.launch {
@@ -435,3 +439,12 @@ class HomeViewModel(
         }
     }
 }
+
+/** 自動折りたたみ対象 (「日課完了で折りたたむ」設定に応じた完了済みグループ) を返す */
+private fun autoCollapsedGroupIds(
+    groups: List<TaskGroup>,
+    tasks: List<Task>,
+    dailyOnly: Boolean,
+): Set<String> = groups.map { it.id }.filter { groupId ->
+    tasks.filter { it.groupId == groupId }.allTasksCompleted(dailyOnly = dailyOnly)
+}.toSet()
