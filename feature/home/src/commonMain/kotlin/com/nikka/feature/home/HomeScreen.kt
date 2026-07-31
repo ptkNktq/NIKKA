@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.CompareArrows
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DateRange
@@ -553,16 +554,16 @@ private fun GroupContextMenu(
             onClick = { onAddTask(TaskType.DAILY) },
         )
         GroupMenuItem(
-            label = "週課を追加",
-            icon = Icons.Rounded.Add,
-            iconTint = MaterialTheme.colorScheme.primary,
-            onClick = { onAddTask(TaskType.WEEKLY) },
-        )
-        GroupMenuItem(
             label = "任意項目を追加",
             icon = Icons.Rounded.Add,
             iconTint = MaterialTheme.colorScheme.primary,
             onClick = { onAddTask(TaskType.OPTIONAL) },
+        )
+        GroupMenuItem(
+            label = "週課を追加",
+            icon = Icons.Rounded.Add,
+            iconTint = MaterialTheme.colorScheme.primary,
+            onClick = { onAddTask(TaskType.WEEKLY) },
         )
         GroupMenuItem(
             label = "日課リセット設定",
@@ -825,13 +826,13 @@ private fun TaskContextMenu(
         when (currentType) {
             TaskType.DAILY -> GroupMenuItem(
                 label = "任意項目に変更",
-                icon = Icons.Rounded.Sync,
+                icon = Icons.AutoMirrored.Rounded.CompareArrows,
                 iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                 onClick = { onChangeType(TaskType.OPTIONAL) },
             )
             TaskType.OPTIONAL -> GroupMenuItem(
                 label = "日課に変更",
-                icon = Icons.Rounded.Sync,
+                icon = Icons.AutoMirrored.Rounded.CompareArrows,
                 iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                 onClick = { onChangeType(TaskType.DAILY) },
             )
