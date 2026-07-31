@@ -238,9 +238,21 @@ class HomeViewModel(
     /** 日課 <-> 任意項目の種別変更。それ以外の種別間の変更は想定していない */
     fun changeTaskType(taskId: String, newType: TaskType) {
         _uiState.update { state ->
+            val newTasks = state.tasks.map { task ->
+                if (task.id == taskId) task.copy(type = newType) else task
+            }
+            // 種別変更でグループが完了状態になったら、toggleTask と同様に自動で折りたたむ
+            val collapseGroupId = state.tasks.find { it.id == taskId }?.groupId?.takeIf { groupId ->
+                newTasks
+                    .filter { it.groupId == groupId }
+                    .allTasksCompleted(dailyOnly = repository.appSettings.value.collapseOnDailyCompleted)
+            }
             state.copy(
-                tasks = state.tasks.map { task ->
-                    if (task.id == taskId) task.copy(type = newType) else task
+                tasks = newTasks,
+                collapsedGroupIds = if (collapseGroupId != null) {
+                    state.collapsedGroupIds + collapseGroupId
+                } else {
+                    state.collapsedGroupIds
                 },
             )
         }
