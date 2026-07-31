@@ -168,6 +168,44 @@ class HomeViewModelTest {
         assertFalse(viewModel.uiState.value.tasks.first().isCompleted)
     }
 
+    @Test
+    fun `changeTaskType changes the task type`() = runTest {
+        viewModel.addGroup("原神")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val groupId = viewModel.uiState.value.groups.first().id
+        viewModel.addTask(groupId, "デイリー")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val taskId = viewModel.uiState.value.tasks.first().id
+
+        viewModel.changeTaskType(taskId, TaskType.OPTIONAL)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(TaskType.OPTIONAL, viewModel.uiState.value.tasks.first().type)
+    }
+
+    @Test
+    fun `changeTaskType auto-collapses group when it becomes completed`() = runTest {
+        // 日課2件のうち1件が未完了のグループで、未完了の日課を任意項目に変更すると
+        // 残った完了済み日課だけが判定対象になり、toggleTask 同様に自動で折りたたまれる
+        viewModel.addGroup("原神")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val groupId = viewModel.uiState.value.groups.first().id
+        viewModel.addTask(groupId, "日課1")
+        viewModel.addTask(groupId, "日課2")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val tasks = viewModel.uiState.value.tasks
+        val incompleteId = tasks[0].id
+        val completeId = tasks[1].id
+        viewModel.toggleTask(completeId)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse(groupId in viewModel.uiState.value.collapsedGroupIds)
+
+        viewModel.changeTaskType(incompleteId, TaskType.OPTIONAL)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(groupId in viewModel.uiState.value.collapsedGroupIds)
+    }
+
     // --- Dialog state tests ---
 
     @Test
@@ -471,6 +509,22 @@ class HomeViewModelTest {
         repository.saveAll(
             groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
             tasks = listOf(Task(id = "t1", groupId = "g1", title = "デイリー", isCompleted = true)),
+        )
+        val vm = HomeViewModel(repository, clock, utc)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.tasks.first().isCompleted)
+    }
+
+    @Test
+    fun `auto reset resets optional tasks at the same timing as daily tasks`() = runTest {
+        // 2026-04-05T10:00 UTC, resetHour=5 → hour=10 >= 5 → 任意項目も日課と同じくリセットされる
+        val clock = fixedClock("2026-04-05T10:00:00Z")
+        repository.saveAll(
+            groups = listOf(TaskGroup(id = "g1", name = "原神", resetHour = 5)),
+            tasks = listOf(
+                Task(id = "t1", groupId = "g1", title = "任意1", isCompleted = true, type = TaskType.OPTIONAL),
+            ),
         )
         val vm = HomeViewModel(repository, clock, utc)
         testDispatcher.scheduler.advanceUntilIdle()
