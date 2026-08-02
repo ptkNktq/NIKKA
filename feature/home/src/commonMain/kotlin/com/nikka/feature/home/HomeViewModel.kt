@@ -208,6 +208,7 @@ class HomeViewModel(
 
     fun addTask(groupId: String, title: String, type: TaskType = TaskType.DAILY) {
         if (title.isBlank()) return
+        if (!_uiState.value.isGroupEnabled(groupId)) return
         _uiState.update { state ->
             val newTask = Task(
                 id = Uuid.random().toString(),
@@ -225,6 +226,7 @@ class HomeViewModel(
     }
 
     fun removeTask(taskId: String) {
+        if (!_uiState.value.isGroupEnabledForTask(taskId)) return
         _uiState.update { state ->
             state.copy(tasks = state.tasks.filter { it.id != taskId })
         }
@@ -233,6 +235,7 @@ class HomeViewModel(
 
     /** 日課 <-> 任意項目の種別変更。それ以外の種別間の変更は想定していない */
     fun changeTaskType(taskId: String, newType: TaskType) {
+        if (!_uiState.value.isGroupEnabledForTask(taskId)) return
         _uiState.update { state ->
             val newTasks = state.tasks.map { task ->
                 if (task.id == taskId) task.copy(type = newType) else task
@@ -243,6 +246,7 @@ class HomeViewModel(
     }
 
     fun toggleTask(taskId: String) {
+        if (!_uiState.value.isGroupEnabledForTask(taskId)) return
         _uiState.update { state ->
             val newTasks = state.tasks.map { task ->
                 if (task.id == taskId) task.copy(isCompleted = !task.isCompleted) else task
@@ -269,6 +273,7 @@ class HomeViewModel(
 
     fun moveTask(groupId: String, type: TaskType, fromIndex: Int, toIndex: Int) {
         if (fromIndex == toIndex) return
+        if (!_uiState.value.isGroupEnabled(groupId)) return
         _uiState.update { state ->
             // 並べ替えは同一グループ・同一種別のセクション内で完結する
             val sectionTasks = state.tasks
@@ -298,6 +303,7 @@ class HomeViewModel(
     }
 
     fun resetGroupTasks(groupId: String) {
+        if (!_uiState.value.isGroupEnabled(groupId)) return
         _uiState.update { state ->
             state.copy(
                 tasks = state.tasks.map { task ->
@@ -458,6 +464,16 @@ private fun autoCollapsedGroupIds(
 ): Set<String> = groups.map { it.id }.filter { groupId ->
     tasks.filter { it.groupId == groupId }.allTasksCompleted(dailyOnly = dailyOnly)
 }.toSet()
+
+/** グループが存在しないか休止中でなければ true (未知の groupId は既存呼び出しとの互換のため許可する) */
+private fun HomeUiState.isGroupEnabled(groupId: String): Boolean =
+    groups.find { it.id == groupId }?.isEnabled != false
+
+/** [taskId] が属するグループが休止中でなければ true */
+private fun HomeUiState.isGroupEnabledForTask(taskId: String): Boolean {
+    val groupId = tasks.find { it.id == taskId }?.groupId ?: return true
+    return isGroupEnabled(groupId)
+}
 
 /** [newTasks] を適用し、[taskId] のグループが完了状態になっていれば自動で折りたたむ */
 private fun HomeUiState.withTasksAndAutoCollapse(

@@ -125,6 +125,34 @@ class HomeViewModelTest {
         assertTrue(groupId in viewModel.uiState.value.collapsedGroupIds)
     }
 
+    @Test
+    fun `mutating operations on a disabled group are ignored`() = runTest {
+        // UI 側 (Compose の enabled/クリック無効化) を経由しない直接呼び出しでも、
+        // 休止中グループへの追加・更新・削除操作は ViewModel 層で弾かれる
+        viewModel.addGroup("原神")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val groupId = viewModel.uiState.value.groups.first().id
+        viewModel.addTask(groupId, "デイリー")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val taskId = viewModel.uiState.value.tasks.first().id
+
+        viewModel.toggleGroupEnabled(groupId)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.addTask(groupId, "休止中に追加されたタスク")
+        viewModel.toggleTask(taskId)
+        viewModel.changeTaskType(taskId, TaskType.OPTIONAL)
+        viewModel.removeTask(taskId)
+        viewModel.resetGroupTasks(groupId)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val tasks = viewModel.uiState.value.tasks
+        assertEquals(1, tasks.size)
+        assertEquals(taskId, tasks.first().id)
+        assertFalse(tasks.first().isCompleted)
+        assertEquals(TaskType.DAILY, tasks.first().type)
+    }
+
     // --- Task tests ---
 
     @Test
