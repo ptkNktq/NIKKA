@@ -18,6 +18,8 @@ data class TaskGroup(
      */
     val weeklyResetHour: Int? = null,
     val lastWeeklyResetDate: LocalDate? = null,
+    /** false の間は休止中。日課・週課の追加/更新を禁止し、通知対象からも除外する */
+    val isEnabled: Boolean = true,
 ) {
     init {
         require(resetHour in 0..MAX_HOUR) {

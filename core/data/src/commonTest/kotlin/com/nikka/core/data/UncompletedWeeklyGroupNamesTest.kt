@@ -69,6 +69,18 @@ class UncompletedWeeklyGroupNamesTest {
     }
 
     @Test
+    fun `disabled group is not listed even with uncompleted weekly tasks`() {
+        val disabledGroup = group("g1", "原神").copy(isEnabled = false)
+        val names = uncompletedWeeklyGroupNames(
+            groups = listOf(disabledGroup),
+            tasks = listOf(task("g1", "週ボス", isCompleted = false)),
+            currentHour = 21,
+            today = sunday,
+        )
+        assertTrue(names.isEmpty())
+    }
+
+    @Test
     fun `pending-reset group with completed weekly task is listed`() {
         // 直近のリセット予定日 (3/30) が未実施 → 完了フラグは前週のものなので信用しない
         val pendingGroup = group("g1", "原神").copy(lastWeeklyResetDate = LocalDate(2026, 3, 23))

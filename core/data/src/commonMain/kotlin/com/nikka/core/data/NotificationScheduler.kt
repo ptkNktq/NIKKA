@@ -248,6 +248,7 @@ internal fun buildReminderMessage(prefix: String?, header: String, groupNames: L
 
 /**
  * 未達成の日課が残っているグループ名を表示順で返す。週課は対象外。空なら通知不要。
+ * 休止中のグループは対象外。
  *
  * HomeViewModel が動いていない間に resetHour が到達した場合、[Task.isCompleted]
  * は前日のまま = true のことがある。そのようなグループの日課は「未完了扱い」で判定する。
@@ -259,6 +260,7 @@ internal fun uncompletedDailyGroupNames(
     today: LocalDate,
 ): List<String> =
     groups
+        .filter { it.isEnabled }
         .filter { group ->
             val pendingReset = group.isDailyResetPending(today, currentHour)
             tasks.any { task ->
@@ -272,6 +274,7 @@ internal fun uncompletedDailyGroupNames(
 /**
  * 未達成の週課が残っているグループ名を表示順で返す。空なら通知不要。
  * 対象は「翌日が週課リセット曜日」のグループのみ (リセットで消える前日に知らせる)。
+ * 休止中のグループは対象外。
  * 週次リセットが未実施のグループは完了フラグが前週のままの可能性があるため「未完了扱い」で判定する。
  */
 internal fun uncompletedWeeklyGroupNames(
@@ -282,6 +285,7 @@ internal fun uncompletedWeeklyGroupNames(
 ): List<String> {
     val tomorrowIsoDay = today.plus(1, DateTimeUnit.DAY).dayOfWeek.isoDayNumber
     return groups
+        .filter { it.isEnabled }
         .filter { it.resetDayOfWeek == tomorrowIsoDay }
         .filter { group ->
             val pendingReset = group.pendingWeeklyResetDate(today, currentHour) != null

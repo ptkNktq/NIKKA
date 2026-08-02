@@ -72,6 +72,18 @@ class UncompletedDailyGroupNamesTest {
     }
 
     @Test
+    fun `disabled group is not listed even with uncompleted daily tasks`() {
+        val disabledGroup = group("g1", "原神").copy(isEnabled = false)
+        val names = uncompletedDailyGroupNames(
+            groups = listOf(disabledGroup),
+            tasks = listOf(task("g1", "daily", isCompleted = false)),
+            currentHour = 21,
+            today = today,
+        )
+        assertTrue(names.isEmpty())
+    }
+
+    @Test
     fun `all tasks completed yields empty list`() {
         val names = uncompletedDailyGroupNames(
             groups = listOf(group("g1", "原神")),

@@ -37,6 +37,8 @@ import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Sync
@@ -65,6 +67,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -115,18 +118,21 @@ fun HomeScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         HomeContent(
             uiState = uiState,
-            onToggleTask = viewModel::toggleTask,
-            onShowAddTask = viewModel::showAddTaskDialog,
-            onRemoveTask = viewModel::removeTask,
-            onChangeTaskType = viewModel::changeTaskType,
-            onRemoveGroup = viewModel::showDeleteGroupConfirm,
-            onToggleGroupCollapse = viewModel::toggleGroupCollapse,
-            onResetGroup = viewModel::resetGroupTasks,
-            onMoveGroup = viewModel::moveGroup,
-            onSettleDrag = viewModel::settleDrag,
-            onMoveTask = viewModel::moveTask,
-            onSetResetHour = viewModel::showResetHourDialog,
-            onSetWeeklyReset = viewModel::showWeeklyResetDialog,
+            actions = HomeContentActions(
+                onToggleTask = viewModel::toggleTask,
+                onShowAddTask = viewModel::showAddTaskDialog,
+                onRemoveTask = viewModel::removeTask,
+                onChangeTaskType = viewModel::changeTaskType,
+                onRemoveGroup = viewModel::showDeleteGroupConfirm,
+                onToggleGroupCollapse = viewModel::toggleGroupCollapse,
+                onToggleGroupEnabled = viewModel::toggleGroupEnabled,
+                onResetGroup = viewModel::resetGroupTasks,
+                onMoveGroup = viewModel::moveGroup,
+                onSettleDrag = viewModel::settleDrag,
+                onMoveTask = viewModel::moveTask,
+                onSetResetHour = viewModel::showResetHourDialog,
+                onSetWeeklyReset = viewModel::showWeeklyResetDialog,
+            ),
         )
         FloatingActionButton(
             onClick = { viewModel.showAddGroupDialog() },
@@ -145,28 +151,34 @@ fun HomeScreen(
     HomeDialogs(uiState = uiState, viewModel = viewModel)
 }
 
+/** [HomeContent] 内の操作コールバック。対象グループ/タスクへの紐付けは呼び出し側で済ませておく */
+private data class HomeContentActions(
+    val onToggleTask: (String) -> Unit,
+    val onShowAddTask: (String, TaskType) -> Unit,
+    val onRemoveTask: (String) -> Unit,
+    val onChangeTaskType: (String, TaskType) -> Unit,
+    val onRemoveGroup: (String) -> Unit,
+    val onToggleGroupCollapse: (String) -> Unit,
+    val onToggleGroupEnabled: (String) -> Unit,
+    val onResetGroup: (String) -> Unit,
+    val onMoveGroup: (Int, Int) -> Unit,
+    val onSettleDrag: () -> Unit,
+    val onMoveTask: (String, TaskType, Int, Int) -> Unit,
+    val onSetResetHour: (String) -> Unit,
+    val onSetWeeklyReset: (String) -> Unit,
+)
+
 @Composable
 private fun HomeContent(
     uiState: HomeUiState,
-    onToggleTask: (String) -> Unit,
-    onShowAddTask: (String, TaskType) -> Unit,
-    onRemoveTask: (String) -> Unit,
-    onChangeTaskType: (String, TaskType) -> Unit,
-    onRemoveGroup: (String) -> Unit,
-    onToggleGroupCollapse: (String) -> Unit,
-    onResetGroup: (String) -> Unit,
-    onMoveGroup: (Int, Int) -> Unit,
-    onSettleDrag: () -> Unit,
-    onMoveTask: (String, TaskType, Int, Int) -> Unit,
-    onSetResetHour: (String) -> Unit,
-    onSetWeeklyReset: (String) -> Unit,
+    actions: HomeContentActions,
 ) {
     if (uiState.groups.isEmpty()) {
         EmptyState()
     } else {
         val lazyListState = rememberLazyListState()
         val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
-            onMoveGroup(from.index, to.index)
+            actions.onMoveGroup(from.index, to.index)
         }
         LazyColumn(
             state = lazyListState,
@@ -184,19 +196,20 @@ private fun HomeContent(
                         isCollapsed = group.id in uiState.collapsedGroupIds,
                         dailyOnlyCompletion = uiState.collapseOnDailyCompleted,
                         actions = GroupCardActions(
-                            onToggleCollapse = { onToggleGroupCollapse(group.id) },
-                            onToggleTask = onToggleTask,
-                            onAddTask = { type -> onShowAddTask(group.id, type) },
-                            onRemoveTask = onRemoveTask,
-                            onChangeTaskType = onChangeTaskType,
-                            onRemoveGroup = { onRemoveGroup(group.id) },
-                            onResetGroup = { onResetGroup(group.id) },
-                            onSetResetHour = { onSetResetHour(group.id) },
-                            onSetWeeklyReset = { onSetWeeklyReset(group.id) },
-                            onMoveTask = onMoveTask,
+                            onToggleCollapse = { actions.onToggleGroupCollapse(group.id) },
+                            onToggleTask = actions.onToggleTask,
+                            onAddTask = { type -> actions.onShowAddTask(group.id, type) },
+                            onRemoveTask = actions.onRemoveTask,
+                            onChangeTaskType = actions.onChangeTaskType,
+                            onRemoveGroup = { actions.onRemoveGroup(group.id) },
+                            onToggleEnabled = { actions.onToggleGroupEnabled(group.id) },
+                            onResetGroup = { actions.onResetGroup(group.id) },
+                            onSetResetHour = { actions.onSetResetHour(group.id) },
+                            onSetWeeklyReset = { actions.onSetWeeklyReset(group.id) },
+                            onMoveTask = actions.onMoveTask,
                         ),
                         dragModifier = Modifier.draggableHandle(
-                            onDragStopped = { onSettleDrag() },
+                            onDragStopped = { actions.onSettleDrag() },
                         ),
                     )
                 }
@@ -330,6 +343,7 @@ private data class GroupCardActions(
     val onRemoveTask: (String) -> Unit,
     val onChangeTaskType: (String, TaskType) -> Unit,
     val onRemoveGroup: () -> Unit,
+    val onToggleEnabled: () -> Unit,
     val onResetGroup: () -> Unit,
     val onSetResetHour: () -> Unit,
     val onSetWeeklyReset: () -> Unit,
@@ -355,7 +369,8 @@ private fun GroupCard(
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surface)
             .animateContentSize()
-            .padding(16.dp),
+            .padding(16.dp)
+            .alpha(if (group.isEnabled) 1f else DISABLED_GROUP_ALPHA),
     ) {
         GroupCardHeader(
             group = group,
@@ -368,6 +383,7 @@ private fun GroupCard(
             GroupCardBody(
                 group = group,
                 tasks = tasks,
+                isEnabled = group.isEnabled,
                 onToggleTask = actions.onToggleTask,
                 onRemoveTask = actions.onRemoveTask,
                 onChangeTaskType = actions.onChangeTaskType,
@@ -376,6 +392,8 @@ private fun GroupCard(
         }
     }
 }
+
+private const val DISABLED_GROUP_ALPHA = 0.5f
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -414,6 +432,7 @@ private fun GroupCardHeader(
         GroupContextMenu(
             expanded = showContextMenu,
             offset = contextMenuOffset,
+            isEnabled = group.isEnabled,
             onDismiss = { showContextMenu = false },
             onAddTask = { type ->
                 showContextMenu = false
@@ -426,6 +445,10 @@ private fun GroupCardHeader(
             onSetWeeklyReset = {
                 showContextMenu = false
                 actions.onSetWeeklyReset()
+            },
+            onToggleEnabled = {
+                showContextMenu = false
+                actions.onToggleEnabled()
             },
             onRemove = {
                 showContextMenu = false
@@ -481,7 +504,7 @@ private fun GroupCardHeaderContent(
                 modifier = Modifier.size(20.dp).then(dragModifier),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            IconButton(onClick = onResetGroup, modifier = Modifier.size(28.dp)) {
+            IconButton(onClick = onResetGroup, enabled = group.isEnabled, modifier = Modifier.size(28.dp)) {
                 Icon(
                     imageVector = Icons.Rounded.Refresh,
                     contentDescription = "リセット",
@@ -534,10 +557,12 @@ private fun GroupCardTitle(
 private fun GroupContextMenu(
     expanded: Boolean,
     offset: DpOffset = DpOffset.Zero,
+    isEnabled: Boolean,
     onDismiss: () -> Unit,
     onAddTask: (TaskType) -> Unit,
     onSetResetHour: () -> Unit,
     onSetWeeklyReset: () -> Unit,
+    onToggleEnabled: () -> Unit,
     onRemove: () -> Unit,
 ) {
     DropdownMenu(
@@ -547,36 +572,21 @@ private fun GroupContextMenu(
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp),
     ) {
-        GroupMenuItem(
-            label = "日課を追加",
-            icon = Icons.Rounded.Add,
-            iconTint = MaterialTheme.colorScheme.primary,
-            onClick = { onAddTask(TaskType.DAILY) },
-        )
-        GroupMenuItem(
-            label = "任意項目を追加",
-            icon = Icons.Rounded.Add,
-            iconTint = MaterialTheme.colorScheme.primary,
-            onClick = { onAddTask(TaskType.OPTIONAL) },
-        )
-        GroupMenuItem(
-            label = "週課を追加",
-            icon = Icons.Rounded.Add,
-            iconTint = MaterialTheme.colorScheme.primary,
-            onClick = { onAddTask(TaskType.WEEKLY) },
-        )
-        GroupMenuItem(
-            label = "日課リセット設定",
-            icon = Icons.Rounded.Refresh,
-            iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
-            onClick = onSetResetHour,
-        )
-        GroupMenuItem(
-            label = "週課リセット設定",
-            icon = Icons.Rounded.DateRange,
-            iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
-            onClick = onSetWeeklyReset,
-        )
+        if (isEnabled) {
+            EnabledGroupMenuItems(
+                onAddTask = onAddTask,
+                onSetResetHour = onSetResetHour,
+                onSetWeeklyReset = onSetWeeklyReset,
+                onToggleEnabled = onToggleEnabled,
+            )
+        } else {
+            GroupMenuItem(
+                label = "再開する",
+                icon = Icons.Rounded.PlayArrow,
+                iconTint = MaterialTheme.colorScheme.primary,
+                onClick = onToggleEnabled,
+            )
+        }
         GroupMenuItem(
             label = "削除",
             icon = Icons.Outlined.Delete,
@@ -585,6 +595,51 @@ private fun GroupContextMenu(
             onClick = onRemove,
         )
     }
+}
+
+@Composable
+private fun EnabledGroupMenuItems(
+    onAddTask: (TaskType) -> Unit,
+    onSetResetHour: () -> Unit,
+    onSetWeeklyReset: () -> Unit,
+    onToggleEnabled: () -> Unit,
+) {
+    GroupMenuItem(
+        label = "日課を追加",
+        icon = Icons.Rounded.Add,
+        iconTint = MaterialTheme.colorScheme.primary,
+        onClick = { onAddTask(TaskType.DAILY) },
+    )
+    GroupMenuItem(
+        label = "任意項目を追加",
+        icon = Icons.Rounded.Add,
+        iconTint = MaterialTheme.colorScheme.primary,
+        onClick = { onAddTask(TaskType.OPTIONAL) },
+    )
+    GroupMenuItem(
+        label = "週課を追加",
+        icon = Icons.Rounded.Add,
+        iconTint = MaterialTheme.colorScheme.primary,
+        onClick = { onAddTask(TaskType.WEEKLY) },
+    )
+    GroupMenuItem(
+        label = "日課リセット設定",
+        icon = Icons.Rounded.Refresh,
+        iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+        onClick = onSetResetHour,
+    )
+    GroupMenuItem(
+        label = "週課リセット設定",
+        icon = Icons.Rounded.DateRange,
+        iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+        onClick = onSetWeeklyReset,
+    )
+    GroupMenuItem(
+        label = "休止する",
+        icon = Icons.Rounded.Pause,
+        iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+        onClick = onToggleEnabled,
+    )
 }
 
 @Composable
@@ -613,6 +668,7 @@ private fun GroupMenuItem(
 private fun GroupCardBody(
     group: TaskGroup,
     tasks: List<Task>,
+    isEnabled: Boolean,
     onToggleTask: (String) -> Unit,
     onRemoveTask: (String) -> Unit,
     onChangeTaskType: (String, TaskType) -> Unit,
@@ -639,6 +695,7 @@ private fun GroupCardBody(
                     groupId = group.id,
                     type = type,
                     tasks = sectionTasks,
+                    isEnabled = isEnabled,
                     onToggleTask = onToggleTask,
                     onRemoveTask = onRemoveTask,
                     onChangeTaskType = onChangeTaskType,
@@ -674,6 +731,7 @@ private fun TaskSection(
     groupId: String,
     type: TaskType,
     tasks: List<Task>,
+    isEnabled: Boolean,
     onToggleTask: (String) -> Unit,
     onRemoveTask: (String) -> Unit,
     onChangeTaskType: (String, TaskType) -> Unit,
@@ -689,10 +747,11 @@ private fun TaskSection(
             ReorderableItem {
                 TaskRow(
                     task = task,
+                    isEnabled = isEnabled,
                     onToggle = { onToggleTask(task.id) },
                     onRemove = { onRemoveTask(task.id) },
                     onChangeType = { newType -> onChangeTaskType(task.id, newType) },
-                    dragModifier = Modifier.draggableHandle(),
+                    dragModifier = if (isEnabled) Modifier.draggableHandle() else Modifier,
                 )
             }
         }
@@ -732,6 +791,7 @@ private fun secondaryClickOffsetModifier(rowHeight: Dp, onSecondaryClick: (DpOff
 @Composable
 private fun TaskRow(
     task: Task,
+    isEnabled: Boolean,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onChangeType: (TaskType) -> Unit,
@@ -747,12 +807,16 @@ private fun TaskRow(
                 .height(TASK_ROW_HEIGHT)
                 .clip(RoundedCornerShape(8.dp))
                 .then(
-                    secondaryClickOffsetModifier(TASK_ROW_HEIGHT) { offset ->
-                        contextMenuOffset = offset
-                        showContextMenu = true
+                    if (isEnabled) {
+                        secondaryClickOffsetModifier(TASK_ROW_HEIGHT) { offset ->
+                            contextMenuOffset = offset
+                            showContextMenu = true
+                        }
+                    } else {
+                        Modifier
                     },
                 )
-                .clickable(onClick = onToggle),
+                .clickable(enabled = isEnabled, onClick = onToggle),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -761,7 +825,7 @@ private fun TaskRow(
                 modifier = Modifier.size(20.dp).then(dragModifier),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TaskRowContent(task = task, onToggle = onToggle)
+            TaskRowContent(task = task, isEnabled = isEnabled, onToggle = onToggle)
         }
         TaskContextMenu(
             expanded = showContextMenu,
@@ -781,10 +845,11 @@ private fun TaskRow(
 }
 
 @Composable
-private fun RowScope.TaskRowContent(task: Task, onToggle: () -> Unit) {
+private fun RowScope.TaskRowContent(task: Task, isEnabled: Boolean, onToggle: () -> Unit) {
     Checkbox(
         checked = task.isCompleted,
         onCheckedChange = { onToggle() },
+        enabled = isEnabled,
         colors = CheckboxDefaults.colors(
             checkedColor = MaterialTheme.colorScheme.primary,
             uncheckedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
