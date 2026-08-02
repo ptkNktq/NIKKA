@@ -87,6 +87,44 @@ class HomeViewModelTest {
         assertTrue(state.tasks.isEmpty())
     }
 
+    @Test
+    fun `toggleGroupEnabled disables group, resets its tasks and collapses it`() = runTest {
+        viewModel.addGroup("原神")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val groupId = viewModel.uiState.value.groups.first().id
+        viewModel.addTask(groupId, "デイリー")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val taskId = viewModel.uiState.value.tasks.first().id
+        viewModel.toggleTask(taskId)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.toggleGroupEnabled(groupId)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.groups.first().isEnabled)
+        assertFalse(state.tasks.first().isCompleted)
+        assertTrue(groupId in state.collapsedGroupIds)
+    }
+
+    @Test
+    fun `toggleGroupEnabled twice re-enables group without touching collapsed state`() = runTest {
+        viewModel.addGroup("原神")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val groupId = viewModel.uiState.value.groups.first().id
+
+        viewModel.toggleGroupEnabled(groupId)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(groupId in viewModel.uiState.value.collapsedGroupIds)
+
+        // 再開時は折りたたみ状態を変えない (ユーザーが自由に開閉できる)
+        viewModel.toggleGroupEnabled(groupId)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.groups.first().isEnabled)
+        assertTrue(groupId in viewModel.uiState.value.collapsedGroupIds)
+    }
+
     // --- Task tests ---
 
     @Test

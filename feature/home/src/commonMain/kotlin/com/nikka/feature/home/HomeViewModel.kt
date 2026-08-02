@@ -57,7 +57,11 @@ class HomeViewModel(
     private val refreshMutex = Mutex()
 
     init {
-        loadData()
+        viewModelScope.launch {
+            refreshMutex.withLock {
+                loadDataLocked()
+            }
+        }
         viewModelScope.launch {
             // 無関係な設定の保存で手動の折りたたみ状態が破棄されないよう、対象フィールドの変化だけ拾う
             repository.appSettings
@@ -87,14 +91,6 @@ class HomeViewModel(
         /** グループのリセット実施日かタスクに変化があったか (永続化要否) */
         val hasChanges: Boolean,
     )
-
-    private fun loadData() {
-        viewModelScope.launch {
-            refreshMutex.withLock {
-                loadDataLocked()
-            }
-        }
-    }
 
     private suspend fun loadDataLocked() {
         val rawGroups = repository.loadGroups()
@@ -308,6 +304,34 @@ class HomeViewModel(
                     if (task.groupId == groupId) task.copy(isCompleted = false) else task
                 },
                 collapsedGroupIds = state.collapsedGroupIds - groupId,
+            )
+        }
+        persistAll()
+    }
+
+    /**
+     * グループの休止 / 再開を切り替える。
+     * 休止時は該当グループの全タスクを未完了に戻し、折りたたんだ状態にする。
+     * 再開時は折りたたみ状態を変更しない (ユーザーが自由に開閉できる)。
+     */
+    fun toggleGroupEnabled(groupId: String) {
+        _uiState.update { state ->
+            val group = state.groups.find { it.id == groupId } ?: return@update state
+            val nowEnabled = !group.isEnabled
+            state.copy(
+                groups = state.groups.map { if (it.id == groupId) it.copy(isEnabled = nowEnabled) else it },
+                tasks = if (nowEnabled) {
+                    state.tasks
+                } else {
+                    state.tasks.map { task ->
+                        if (task.groupId == groupId) task.copy(isCompleted = false) else task
+                    }
+                },
+                collapsedGroupIds = if (nowEnabled) {
+                    state.collapsedGroupIds
+                } else {
+                    state.collapsedGroupIds + groupId
+                },
             )
         }
         persistAll()
